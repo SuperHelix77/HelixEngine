@@ -20,6 +20,12 @@ from .pricing import Prices, estimate
 from .state import State
 
 
+# Conservative byte heuristics, not a claim of native token economics. Returning
+# complete raw output avoids marginal projection/retrieval costs without turning
+# off Engine capture or removing any information from the model.
+OUTPUT_ADMISSION_MIN_RAW_BYTES = 2048
+OUTPUT_ADMISSION_MIN_SAVINGS_BYTES = 512
+OUTPUT_ADMISSION_MIN_SAVINGS_PERCENT = 20
 APP_VERSION = "0.1.0"
 RELEASE_VERSION = "0.1.0-preview.1"
 PRICE_REFRESH_SECONDS = 120
@@ -265,19 +271,30 @@ class Runtime:
         visible_bytes = raw_bytes
         reducer_error = None
         if enabled:
-            try:
-                projection = self.reducer(self.store, receipt_key, kind)
-                projection_blob = _json_bytes(projection)
-                if len(projection_blob) < raw_bytes:
-                    packet_key = self.store.put(projection_blob)["sha256"]
-                    visible_bytes = len(projection_blob)
-                    reducer_status = "REDUCED"
-                else:
-                    reducer_status = "BYPASSED_SMALL_OUTPUT"
-            except Exception as exc:
-                # The captured receipt is authoritative and remains available.
-                reducer_status = "FAILED_FALLBACK_RAW"
-                reducer_error = f"{type(exc).__name__}: {exc}"
+            if raw_bytes < OUTPUT_ADMISSION_MIN_RAW_BYTES:
+                reducer_status = "BYPASSED_SMALL_OUTPUT"
+            else:
+                try:
+                    projection = self.reducer(self.store, receipt_key, kind)
+                    projection_blob = _json_bytes(projection)
+                    packet_bytes = len(projection_blob)
+                    savings_bytes = raw_bytes - packet_bytes
+                    if packet_bytes >= raw_bytes:
+                        reducer_status = "BYPASSED_SMALL_OUTPUT"
+                    elif (
+                        savings_bytes >= OUTPUT_ADMISSION_MIN_SAVINGS_BYTES
+                        and savings_bytes * 100
+                        >= raw_bytes * OUTPUT_ADMISSION_MIN_SAVINGS_PERCENT
+                    ):
+                        packet_key = self.store.put(projection_blob)["sha256"]
+                        visible_bytes = packet_bytes
+                        reducer_status = "REDUCED"
+                    else:
+                        reducer_status = "BYPASSED_MARGINAL_GAIN"
+                except Exception as exc:
+                    # The captured receipt is authoritative and remains available.
+                    reducer_status = "FAILED_FALLBACK_RAW"
+                    reducer_error = f"{type(exc).__name__}: {exc}"
 
         exit_code = receipt["exit_code"]
         terminal_state = (

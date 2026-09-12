@@ -5,6 +5,8 @@ import sys
 import threading
 import time
 
+import pytest
+
 from helixengine.runtime import Runtime
 
 
@@ -53,6 +55,51 @@ def test_on_reduces_only_when_projection_is_smaller(tmp_path):
     assert row["stdout_bytes"] > row["visible_bytes"]
     assert row["reducer_status"] == "REDUCED"
     assert row["packet_receipt"]
+
+
+def test_small_binary_output_keeps_exact_streams_without_projection(tmp_path):
+    def must_not_parse(*args):
+        raise AssertionError('Small output should not pay projection/retrieval overhead')
+
+    runtime = Runtime(tmp_path, reducer=must_not_parse)
+    try:
+        result = runtime.run(command("import sys;sys.stdout.buffer.write(b'A\\x00B\\n');sys.stderr.buffer.write(b'failure\\n');sys.exit(7)"), tmp_path)
+        assert runtime.visible_output(result) == (b'A\x00B\n', b'failure\n')
+        assert result['exit_code'] == 7
+        assert result['run']['reducer_status'] == 'BYPASSED_SMALL_OUTPUT'
+        assert result['run']['enabled'] is True
+        receipt = runtime.store.receipt(result['receipt'])
+        assert runtime.store.get(receipt['stdout']['sha256']) == b'A\x00B\n'
+    finally:
+        runtime.close()
+
+
+@pytest.mark.parametrize('raw_size,packet_size,admitted', [
+    (2050, 1639, False),  # Proportional gain alone does not cover fixed overhead.
+    (5000, 4400, False),  # Fixed gain alone can still be marginal.
+    (2048, 1536, True),
+    (3000, 2400, True),
+])
+def test_marginal_projection_keeps_raw_and_material_projection_is_delivered(tmp_path, raw_size, packet_size, admitted):
+    calls = []
+    def projection(*args):
+        calls.append(True)
+        return {'p': 'x' * (packet_size - 8)}
+
+    runtime = Runtime(tmp_path, reducer=projection)
+    try:
+        result = runtime.run(command("import sys;sys.stdout.write('a'*int(sys.argv[1]))", raw_size), tmp_path)
+        out, err = runtime.visible_output(result)
+        assert calls == [True] and err == b'' and result['exit_code'] == 0
+        assert result['run']['enabled'] is True
+        if admitted:
+            assert len(out) == packet_size and result['run']['reducer_status'] == 'REDUCED'
+        else:
+            assert out == b'a' * raw_size
+            assert result['run']['reducer_status'] == 'BYPASSED_MARGINAL_GAIN'
+            assert result['packet_receipt'] is None
+    finally:
+        runtime.close()
 
 
 def test_live_progress_and_timeout_are_observed(tmp_path):
