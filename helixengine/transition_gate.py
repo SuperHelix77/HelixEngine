@@ -1,8 +1,9 @@
-"""Receive-only, exact prompt transition gate.
+"""Exact prompt transition gate with optional caller-bound materialization.
 
 This module records already-captured native prompts against an immutable grant.
-It deliberately has no semantic classifier, model call, hook integration, or
-external effect.  The caller owns the expected completion-ledger head; the
+The recording decision has no semantic classifier or model call. The separate
+materialize_recording helper performs only explicitly granted exact file work;
+the native controller owns its completion/failure fence. The caller owns the expected completion-ledger head; the
 mutable ledger index is used only by ``CompletionLedger.ingest`` for its
 idempotent publication protocol.
 """
@@ -37,7 +38,7 @@ _GRANT_COMMON_FIELDS = {
     "unresolved_obligations",
     "dependencies",
 }
-_GRANT_MODES = ({"steps"}, {"recording"})
+_GRANT_MODES = ({"steps"}, {"recording"}, {"recording", "materialization"})
 _CAPTURE_FIELDS = {
     "agent_id",
     "authority",
@@ -236,6 +237,33 @@ def _validate_grant(memory, grant, *, stored=False):
         expected = _digest(dependency["sha256"], "dependency sha256")
         if _dependency_digest(path) != expected:
             raise ValueError("Dependency hash mismatch")
+
+    if "materialization" in grant:
+        target = grant["materialization"]
+        if not isinstance(target, dict) or set(target) != {
+            "path", "initial_sha256", "initial_bytes", "format", "write_authority"
+        }:
+            raise ValueError("Invalid materialization binding")
+        if target["format"] != "exact-prompt-append-v1" or target["write_authority"] != "exclusive":
+            raise ValueError("Explicit exclusive exact-append authority required")
+        path = Path(_text(target["path"], "materialization path"))
+        project = Path(grant["project"])
+        if not path.is_absolute() or not project.is_absolute() or ".." in path.parts:
+            raise ValueError("Absolute project-bound materialization path required")
+        if not path.is_relative_to(project) or path == project or str(path) in seen_paths:
+            raise ValueError("Materialization must be inside project and separate from dependencies")
+        _digest(target["initial_sha256"], "materialization initial root")
+        if type(target["initial_bytes"]) is not int or not 0 <= target["initial_bytes"] <= 1024 * 1024:
+            raise ValueError("Materialization initial bytes exceed bound")
+        initial = memory.store.get(target["initial_sha256"])
+        if len(initial) != target["initial_bytes"]:
+            raise ValueError("Materialization initial source mismatch")
+        if not stored:
+            from .recording_artifact import verify
+            try:
+                verify(str(path), initial)
+            except Exception as exc:
+                raise ValueError("Materialization initial file cannot be verified") from exc
 
     return grant
 
@@ -625,6 +653,31 @@ def _recover_history(memory, grant, grant_hash, expected_head):
     if cursor > limit:
         raise ValueError("Transition cursor exceeds grant")
     return ledger, rows, by_native, cursor, invalidated
+
+
+def materialize_recording(memory, grant_hash, expected_head):
+    """Complete one explicitly bound artifact from verified cold records.
+
+    The controller calls this only after recording and while its durable
+    in-flight fence is held. This is not a transaction with either database;
+    any uncertain publication must disable suppression and expose recovery.
+    A caller must have established exclusive write authority, not inferred a
+    filename or a promise from model prose. Captured text remains data.
+    """
+    from .recording_artifact import publish
+    grant = _read_grant(memory, grant_hash)
+    target = grant.get("materialization")
+    if target is None:
+        raise ValueError("No bound materialization")
+    _, rows, _, _, invalidated = _recover_history(memory, grant, grant_hash, expected_head)
+    if invalidated or not rows:
+        raise ValueError("Materialization requires valid recorded history")
+    initial = memory.store.get(target["initial_sha256"])
+    pieces = [entry["capture"]["prompt"].encode("utf-8") + b"\n" for entry in rows]
+    before = initial + b"".join(pieces[:-1])
+    after = before + pieces[-1]
+    result = publish(target["path"], before, after)
+    return {**result, "grant_hash": grant_hash, "transition_head": expected_head}
 
 
 def _result(state, head, *, replayed=False, reason, receipt=None, notification=None, include_receipt=False, include_notification=False):

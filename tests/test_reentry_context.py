@@ -294,8 +294,46 @@ def test_reentry_context_rejects_more_than_2048_rows(tmp_path):
     data_dir = tmp_path / "data"
     project = tmp_path / "project"
     project.mkdir()
-    for index in range(2049):
-        _insert_outbox(data_dir, thread_id="root", project=project, event_id=f"event-{index}")
+    transitions.status(data_dir, "root")
+    rows = [
+        (
+            "root",
+            "c" * 64,
+            f"event-{index}",
+            "d" * 64,
+            "e" * 64,
+            0,
+            json.dumps(
+                {
+                    "record_hash": "a" * 64,
+                    "source_hash": "b" * 64,
+                    "event_id": f"event-{index}",
+                    "thread_id": "root",
+                    "project": str(project),
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+            1.0,
+        )
+        for index in range(2049)
+    ]
+    with State(data_dir).db() as db:
+        db.execute("BEGIN")
+        try:
+            db.executemany(
+                """
+                INSERT INTO native_transition_outbox(
+                    thread_id, grant_hash, event_key, receipt, head, replayed,
+                    capture_refs, notification_state, created
+                ) VALUES(?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)
+                """,
+                rows,
+            )
+            db.execute("COMMIT")
+        except Exception:
+            db.execute("ROLLBACK")
+            raise
 
     with pytest.raises(ValueError, match="bounded scan"):
         transitions.reentry_context(data_dir, "root")

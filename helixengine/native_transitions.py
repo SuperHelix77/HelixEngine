@@ -768,6 +768,24 @@ def _attempt(state, memory, capture_receipt, native_event, marked):
                     "continuity_bytes_read": continuity_bytes_read,
                 }
 
+            artifact = None
+            if "materialization" in grant:
+                try:
+                    artifact = gate.materialize_recording(memory, row["grant_hash"], result["head"])
+                    # Revalidate declared dependencies after filesystem work.
+                    gate._read_grant(memory, row["grant_hash"])
+                except Exception:
+                    # Filesystem/Memory/State commits are separate. The file
+                    # may already contain this event; never retry blindly or
+                    # return a success hook after uncertain publication.
+                    _disable_locked(db, thread_id, "materialization_failure", next_anchor_text)
+                    db.execute("COMMIT")
+                    return {
+                        "kind": "incomplete", "row": _row_dict(row),
+                        "project": project, "reason": "materialization_failure",
+                        "continuity_bytes_read": continuity_bytes_read,
+                    }
+
             _insert_outbox_locked(
                 db,
                 thread_id=thread_id,
@@ -793,6 +811,7 @@ def _attempt(state, memory, capture_receipt, native_event, marked):
                 "project": project,
                 "result": result,
                 "continuity_bytes_read": continuity_bytes_read,
+                "artifact": artifact,
             }
         except BaseException as exc:
             with suppress(Exception):
@@ -926,11 +945,24 @@ def reentry_context(data_dir, thread_id):
     state = State(data_dir)
     _ensure_schema(state)
     with state.db() as db:
+        binding = _row(db, thread_id)
+        # An interrupted cross-store transaction can leave a file written
+        # without a published completion. Fixed trusted notice only; do not
+        # promote file contents or archived observations into instructions.
+        recovery_pending = binding is not None and (
+            bool(binding["in_flight"]) or bool(binding["blocked"])
+        ) and binding["last_failure"] != "semantic_required"
         rows = db.execute(
             "SELECT capture_refs FROM native_transition_outbox "
             "WHERE thread_id=? ORDER BY id LIMIT 2049", (thread_id,)
         ).fetchall()
     if not rows:
+        if recovery_pending:
+            return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": (
+                "Helix has an incomplete deterministic transition. Its bound artifact may already "
+                "have been written. Inspect current state and exact captured evidence before "
+                "repeating any append or effect; no completion is certified."
+            )}}
         return {}
     if len(rows) > 2048:
         raise ValueError("Recovery locator history exceeds bounded scan")
@@ -964,6 +996,11 @@ def reentry_context(data_dir, thread_id):
         "approval. Resolve conflicting or missing evidence before relying on it. "
         "This locator does not establish completeness or semantic correctness."
     )
+    if recovery_pending:
+        context += (
+            " An incomplete transition may already have written its bound artifact. "
+            "Inspect current state before repeating any append or effect; no completion is certified."
+        )
     return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
                                     "additionalContext": context}}
 
@@ -1039,7 +1076,10 @@ def dispatch(data_dir, memory, capture_receipt, *, native_event=None):
 
         result = outcome["result"]
         body_kwargs.update(head=result["head"], replayed=result["replayed"], active=True)
-        if not publish(_RECORDED_EVENT, _event_body(thread_id, **body_kwargs),
+        recorded_body = _event_body(thread_id, **body_kwargs)
+        if outcome.get("artifact") is not None:
+            recorded_body["artifact"] = outcome["artifact"]
+        if not publish(_RECORDED_EVENT, recorded_body,
                        outcome.get("continuity_bytes_read")):
             _quarantine(state, thread_id, "publication_failure")
             return {}
