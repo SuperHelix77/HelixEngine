@@ -18,6 +18,16 @@ def stamp(s):
     return [s.st_dev,s.st_ino,s.st_size,s.st_mtime_ns,s.st_ctime_ns,mode]
 
 
+def same_open_file(path_stat, descriptor_stat):
+    left, right = stamp(path_stat), stamp(descriptor_stat)
+    if WINDOWS:
+        # Some CPython Windows builds expose creation time via stat and
+        # change time via fstat. Compare each clock with its own later read;
+        # persist both clocks below rather than discarding either binding.
+        left[4] = right[4]
+    return left == right
+
+
 def local_path(root,name):
     if not isinstance(name,str) or not name or '\x00' in name or any(x in ('','.','..') for x in name.replace('\\','/').split('/')):
         raise ValueError('Invalid relative dependency path')
@@ -38,18 +48,21 @@ def read_file(path,metrics):
     data=b''
     try:
         before=os.fstat(fd)
-        if stamp(initial)!=stamp(before):
+        if not same_open_file(initial,before):
             fields=('device','file_id','size','mtime_ns','ctime_ns','mode')
             changes={key:[a,b] for key,a,b in zip(fields,stamp(initial),stamp(before)) if a!=b}
             raise ValueError('Dependency identity changed before read: '+str(changes))
         if not stat.S_ISREG(before.st_mode):raise ValueError('Dependency is not a regular file')
         with os.fdopen(fd,'rb',closefd=False) as f:data=f.read()
         after=os.fstat(fd)
-        if stamp(before)!=stamp(after) or stamp(after)!=stamp(path.stat(follow_symlinks=False)):
+        final_path=path.stat(follow_symlinks=False)
+        if stamp(before)!=stamp(after) or stamp(initial)!=stamp(final_path) or not same_open_file(final_path,after):
             raise ValueError('Dependency changed during read')
     finally:os.close(fd)
     metrics['bytes_read']+=len(data);metrics['bytes_hashed']+=len(data)
     identity={'sha256':digest(data),'stamp':stamp(after)}
+    if WINDOWS:
+        identity['path_stamp'] = stamp(final_path)
     metrics['seconds']+=time.perf_counter()-start
     return identity,data
 

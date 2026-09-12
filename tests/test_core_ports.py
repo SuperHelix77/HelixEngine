@@ -29,6 +29,32 @@ def test_windows_stamp_ignores_only_synthetic_execute_bits(monkeypatch):
     assert dep.stamp(path_stat) != dep.stamp(fd_stat)
 
 
+def test_windows_read_retains_both_timestamp_bindings(tmp_path, monkeypatch):
+    source = tmp_path / 'input.bin'
+    source.write_bytes(b'exact')
+    original_fstat = os.fstat
+    changed = False
+    calls = 0
+
+    def descriptor_stat(fd):
+        nonlocal calls
+        value = original_fstat(fd)
+        fields = {name: getattr(value, name) for name in
+                  ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns', 'st_mode')}
+        fields['st_ctime_ns'] += 100 + (calls if changed else 0)
+        calls += 1
+        return SimpleNamespace(**fields)
+
+    monkeypatch.setattr(dep, 'WINDOWS', True)
+    monkeypatch.setattr(os, 'fstat', descriptor_stat)
+    identity, data = dep.read_file(source, dep.metric())
+    assert data == b'exact'
+    assert identity['stamp'][4] == identity['path_stamp'][4] + 100
+    changed = True
+    with pytest.raises(ValueError, match='changed during read'):
+        dep.read_file(source, dep.metric())
+
+
 def test_all_copied_core_ports_import_as_package():
     for name in (
         "checked_steps",
