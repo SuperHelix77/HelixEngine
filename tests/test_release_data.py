@@ -55,6 +55,11 @@ def test_public_evidence_retains_rejection_and_qualification_limits():
     assert installed['state'] == 'NO_ECONOMIC_QUALIFICATION'
     assert installed['savings']['input_tokens'] < 0 and installed['savings']['output_tokens'] < 0
     assert all(arm['engine_runs'] == 0 for arm in installed['arms'])
+    recording = next(lane for lane in state['lanes'] if lane['id'] == 'astra-high-bound-recording')
+    assert recording['paired_tasks'] == 1
+    assert 65 < recording['savings']['input_tokens'] < 66
+    assert 50 < recording['savings']['output_tokens'] < 51
+    assert recording['arms'][0]['artifact_sha256'] == recording['arms'][1]['artifact_sha256']
     for lane in state['lanes']:
         assert lane['model_wide_parity'] is False
         assert lane['release_median'] is None
@@ -118,3 +123,15 @@ def test_unpaired_route_failure_requires_strict_zero_integer_paired_tasks(tmp_pa
         state = release_data.project(read, root)
         assert state['lanes'] == []
         assert state['problems'][0]['error'] == 'Incomplete pair'
+
+
+def test_uncached_delta_excludes_cache_writes(tmp_path):
+    root = tmp_path/'capsules'
+    on = unpaired_lane()['arms'][0]
+    on['usage'].update(input_tokens=120, cached_input_tokens=40, cache_write_input_tokens=60)
+    off = {'arm': 'off', 'usage': {**on['usage'], 'cache_write_input_tokens': 40}}
+    write_lane(root, unpaired_lane(state='BOUNDED_DEVELOPMENT_CANDIDATE', paired_tasks=1, arms=[off, on]))
+    state = release_data.project(read, root)
+    assert state['problems'] == []
+    assert state['lanes'][0]['savings']['uncached_input_tokens'] == 50.0
+    assert state['lanes'][0]['savings']['input_tokens'] == 0.0

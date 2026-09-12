@@ -13,6 +13,8 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
+# Leave bounded headroom for the second installed-artifact suite on Windows 3.13.
+_PYTEST_TIMEOUT = 300 if os.name == "nt" and sys.version_info[:2] >= (3, 13) else 240
 
 
 def _environment() -> dict[str, str]:
@@ -95,7 +97,7 @@ def main() -> int:
             ],
             cwd=outside,
             env=environment,
-            timeout=240,
+            timeout=_PYTEST_TIMEOUT,
         )
         if test_result.returncode:
             raise SystemExit(test_result.returncode)

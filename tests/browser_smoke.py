@@ -52,6 +52,10 @@ def main():
                 expect(unpaired).to_contain_text('Attempt input: 213,670 tokens · Attempt output: 1,013 tokens')
                 assert unpaired.locator('.card-values strong').all_text_contents() == ['—', '—', '—']
                 expect(page.locator('#cost-table')).to_contain_text('Not run')
+                recording = page.locator('.model-card').filter(has_text='Recording / installed exact artifact and normal re-entry')
+                expect(recording).to_contain_text('N = 1 · development')
+                assert recording.locator('.card-values strong').all_text_contents() == ['65.8%', '50.3%', '39.2%']
+                expect(recording).to_contain_text('65% output target FAIL')
                 expect(page.locator('#engine-switch')).to_be_enabled()
                 assert page.locator('#engine-switch').is_checked()
                 page.locator('label[for="engine-switch"]').click()

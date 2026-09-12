@@ -47,7 +47,9 @@ def project(read_bytes, directory=None):
                     a, b = arms['off']['usage'], arms['on']['usage']
                     def delta(x, y): return 100 * (1 - y / x) if x else None
                     lane['savings'] = {k: delta(a[k], b[k]) for k in ('input_tokens', 'output_tokens')}
-                    lane['savings']['uncached_input_tokens'] = delta(a['input_tokens'] - a['cached_input_tokens'], b['input_tokens'] - b['cached_input_tokens'])
+                    lane['savings']['uncached_input_tokens'] = delta(
+                        a['input_tokens'] - a['cached_input_tokens'] - a['cache_write_input_tokens'],
+                        b['input_tokens'] - b['cached_input_tokens'] - b['cache_write_input_tokens'])
                 lane['capsule_sha256'] = entry['sha256']
                 lane['integrity'] = 'VERIFIED_PUBLIC_CAPSULE'
                 result['lanes'].append(lane)

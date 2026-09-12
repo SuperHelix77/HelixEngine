@@ -1,0 +1,61 @@
+{
+  "id": "astra-high-bound-recording",
+  "model": "gpt-6-astra",
+  "effort": "high",
+  "task": "Recording / installed exact artifact and normal re-entry",
+  "policy": "Caller-prepared capabilities + bound recording artifact; native semantic final",
+  "state": "BOUNDED_DEVELOPMENT_CANDIDATE",
+  "gate": "Exact artifacts and observed policy answers PASS; 65% output target FAIL",
+  "model_wide_parity": false,
+  "release_median": null,
+  "paired_tasks": 1,
+  "fixed_cohort_cells": 7,
+  "final_contract": "Normal model-written prose; same High effort and ordinary tools.",
+  "report_url": "https://github.com/SuperHelix77/HelixEngine/blob/codex/research-hub-observer/docs/research/ASTRA_BOUND_RECORDING_PAIR_20260912.md",
+  "report_sha256": "a152f8eae98ac616187034f6ce50da946b281f41325e8d4af562f4f18490aa19",
+  "arms": [
+    {
+      "arm": "off",
+      "usage": {
+        "input_tokens": 159228,
+        "cached_input_tokens": 145536,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 913,
+        "reasoning_output_tokens": 27
+      },
+      "native_sha256": "392fe1e15a8bfbd9b7ede77af693bf5c668a4ed91a9e888f7760ed72184c3cc9",
+      "segments": 9,
+      "seconds": 67.39610525000171,
+      "final_sha256": "684c8fe51638a20d26e7248259cac036867aa7b315134f91d145989fa68374e7",
+      "final_url": "https://github.com/SuperHelix77/HelixEngine/blob/codex/research-hub-observer/docs/research/ASTRA_BOUND_RECORDING_PAIR_20260912.md#control-final-answer",
+      "recorded_transitions": 0,
+      "command_count": 4,
+      "artifact_sha256": "46cadd07b9e2ecbdb5c91ee17db89d60d62b3d76755cca225c043bcb7c258551"
+    },
+    {
+      "arm": "on",
+      "usage": {
+        "input_tokens": 54403,
+        "cached_input_tokens": 46080,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 454,
+        "reasoning_output_tokens": 65
+      },
+      "native_sha256": "5aab76fd3bb6cb23e029c129c8cd6a1161cb6a7878b185fff439664dca4dd89e",
+      "segments": 3,
+      "seconds": 43.689870000001974,
+      "final_sha256": "1a713e58c956a2d7cb9f2c242e9b52f18370c5c72c3939cdc04b51f501545dfc",
+      "final_url": "https://github.com/SuperHelix77/HelixEngine/blob/codex/research-hub-observer/docs/research/ASTRA_BOUND_RECORDING_PAIR_20260912.md#helix-final-answer",
+      "recorded_transitions": 3,
+      "command_count": 1,
+      "artifact_sha256": "46cadd07b9e2ecbdb5c91ee17db89d60d62b3d76755cca225c043bcb7c258551"
+    }
+  ],
+  "limits": [
+    "One five-turn development pair, not a W50 result, holdout, seven-cell median or model-wide parity.",
+    "Control includes capture-only hook overhead; candidate requires explicit caller preparation and authorization.",
+    "Root preparation, workers, failures, recovery and local overhead are additional research costs.",
+    "Output target not met; no claim of included-plan quota savings or universal economics."
+  ],
+  "cost_scope": "Native paired task counters; wall time includes caller preflight. Total research cost and included-plan quota unknown."
+}

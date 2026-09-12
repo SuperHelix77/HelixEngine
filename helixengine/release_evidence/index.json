@@ -28,6 +28,10 @@
     {
       "file": "astra-high-recording-reentry.json",
       "sha256": "4c6107820a76eb24bffe9d6326307b603b46a19ce31a18abdddbbd2095c870c7"
+    },
+    {
+      "file": "astra-high-bound-recording.json",
+      "sha256": "42379dab8f889ff2b5834a9da899061419b4ebafaaaa31eee5fdfbe2b3e7d5f1"
     }
   ]
 }
