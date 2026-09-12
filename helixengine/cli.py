@@ -35,6 +35,8 @@ def _parser():
     serve_command.add_argument("--research", action="store_true", help="use an isolated research hub")
     serve_command.add_argument("--observe-rollout", help="explicit local Codex rollout; metadata only")
     serve_command.add_argument("--observe-thread", help="exact thread identity to observe")
+    serve_command.add_argument('--capture-statements-project',
+        help='opt in to exact visible assistant statement memory for this project; no reasoning capture')
 
     for name in ("on", "off", "status", "doctor"):
         commands.add_parser(name)
@@ -147,6 +149,8 @@ def main(argv=None):
             raise ValueError("Both --observe-rollout and --observe-thread are required")
         if args.observe_rollout and not args.research:
             raise ValueError("Chat observation is research-only")
+        if args.capture_statements_project and not args.observe_rollout:
+            raise ValueError('Statement capture requires explicit chat observation')
         if args.research:
             if args.port == 8769:
                 raise ValueError("Research must use a different port from release (try 8770)")
@@ -157,7 +161,11 @@ def main(argv=None):
         if args.command == "serve":
             runtime.research = args.research
             if args.observe_rollout:
-                runtime.attach_chat(args.observe_rollout, args.observe_thread)
+                if args.capture_statements_project:
+                    runtime.attach_chat(args.observe_rollout, args.observe_thread,
+                                        statement_project=args.capture_statements_project)
+                else:
+                    runtime.attach_chat(args.observe_rollout, args.observe_thread)
             serve(runtime, args.port, args.open)
             return 0
         if args.command == "status":

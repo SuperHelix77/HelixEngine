@@ -15,13 +15,16 @@ from .chat_observer import ChatObserver, ObserverError, MAX_LINE_BYTES, _USAGE_K
 
 
 class ObserverTree:
-    def __init__(self, root_observer, state, codex_home):
+    def __init__(self, root_observer, state, codex_home, *, statement_factory=None):
         self.root = root_observer
         self.state = state
         self.home = Path(codex_home).resolve() if codex_home is not None else None
         self.children = {}
         self.next_retry = {}
         self.rotation = 0
+        self.statement_factory = statement_factory
+        self.statement_deliveries = {}
+        self.capture_statements = False
         with self.root._db() as db:
             db.executescript('''
                 CREATE TABLE IF NOT EXISTS tree_state(id INTEGER PRIMARY KEY,
@@ -192,8 +195,16 @@ class ObserverTree:
             error, snapshot = None, None
             try:
                 child = self._child(link)
+                child.capture_statements = self.capture_statements and self.statement_factory is not None
                 snapshot = child.scan()
                 self._import(child, link)
+                if self.statement_factory is not None:
+                    try:
+                        if link['child'] not in self.statement_deliveries:
+                            self.statement_deliveries[link['child']] = self.statement_factory(child)
+                        snapshot['statements'] = self.statement_deliveries[link['child']].drain()
+                    except Exception as exc:
+                        snapshot['statements'] = {'coverage': 'UNKNOWN', 'error': type(exc).__name__}
                 error = snapshot.get('error')
             except Exception as exc:
                 error = f'{type(exc).__name__}: {exc}'[:512]
@@ -222,6 +233,7 @@ class ObserverTree:
                                  'coverage_complete': snap.get('coverage_complete', False),
                                  'cursor': snap.get('cursor'), 'bytes_read': snap.get('bytes_read'),
                                  'usage': snap.get('usage')})
+                children[-1]['statements'] = snap.get('statements')
                 imported = db.execute('SELECT count(*) FROM usage_records WHERE thread_id=?', (link['child'],)).fetchone()[0]
                 children[-1]['imported_response_count'] = imported
                 children[-1]['import_pending'] = None if snap.get('response_count') is None else snap['response_count'] - imported

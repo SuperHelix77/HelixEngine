@@ -196,6 +196,11 @@ An attached native research session also follows discovered child usage receipts
 through the same observer parser. See [parent and child accounting](docs/CHILD_USAGE.md)
 for scope, native registry compatibility, deduplication and explicit coverage gaps.
 
+Optional [visible-statement memory](docs/STATEMENT_MEMORY.md) preserves exact
+assistant commentary/final messages from an explicitly attached research session
+and its verified children. It requires a project opt-in and follows the Engine
+switch. It does not capture reasoning or invoke a memory model.
+
 The bundled `release_evidence` directory contains hash-bound public capsules
 and their qualification limits. It is not a research ledger, provider
 attestation, or proof of model-wide parity. This release only observes

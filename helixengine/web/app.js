@@ -411,6 +411,7 @@ function renderRuntime() {
   details.replaceChildren();
   const settings = state.snapshot?.settings || {};
   const memory = state.snapshot?.receipt_memory || {};
+  const statements = state.snapshot?.statement_memory;
   const values = [
     ['Application version', state.snapshot?.app_version],
     ['Settings revision', number(settings.revision) == null ? '—' : formatInteger(settings.revision)],
@@ -420,6 +421,9 @@ function renderRuntime() {
     ['Pending receipt events', number(memory.backlog) == null ? 'Unknown' : formatInteger(memory.backlog)],
     ['Last memory batch', memory.last_batch?.wall_seconds == null ? 'Unknown' : `${(memory.last_batch.wall_seconds * 1000).toFixed(1)} ms`],
     ['Last memory index bytes', number(memory.last_batch?.index_input_bytes) == null ? 'Unknown' : formatInteger(memory.last_batch.index_input_bytes)],
+    ['Statement memory', !statements ? 'Not enabled' : (statements.error || statements.worker_error) ? `GAP: ${statements.error || statements.worker_error}` : statements.enabled ? 'Visible assistant messages; historical only' : 'Capture paused (Engine OFF)'],
+    ['Root statements indexed / pending', !statements ? '—' : `${formatInteger(statements.delivered)} / ${formatInteger(statements.pending)}`],
+    ['Statement source bytes read', !statements ? '—' : formatInteger(statements.bytes_read)],
     ['Last snapshot', dateTime(state.snapshot?.observed_at, 'Unknown')]
   ];
   for (const [label, value] of values) {

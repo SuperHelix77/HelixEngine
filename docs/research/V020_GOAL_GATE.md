@@ -7,6 +7,15 @@ mandatory. This supersedes the older 75% release threshold for Sol/Luna; it does
 not waive any parity or scope requirement. Astra High and XHigh remain separate.
 Luna High, Sol High and both Astra efforts must not inherit each other's results.
 
+The original fixed equal-weight seven-cell cohort has been recovered from
+`research/hud-live/config.json` (SHA256
+`c79220520df54b9e7c85d46bc20fd0e1959becf7749d08d2bc9d92143259bc32`):
+**intervals, dependencies, transactions, maintenance, selection, cold, w50**.
+The prospective `release-native-full-astra-high-v2` and earlier native-answer
+model cohorts agree on these cells. Configured historical 75% thresholds are
+superseded by the current 65% goal; missing cells remain missing. Recovering
+the registry does not qualify the fixtures, runner bindings or any model.
+
 ## Completion evidence required
 
 | Requirement | Evidence required before release | Current disposition |

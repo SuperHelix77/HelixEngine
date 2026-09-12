@@ -111,9 +111,12 @@ class ChatObserver:
     JSON payload columns.
     """
 
-    def __init__(self, data_dir, rollout_path, thread_id, *, from_start=False):
+    def __init__(self, data_dir, rollout_path, thread_id, *, from_start=False, capture_statements=False):
         if type(from_start) is not bool:
             raise ObserverError('Boolean history opt-in required')
+        if type(capture_statements) is not bool:
+            raise ObserverError('Boolean statement capture opt-in required')
+        self.capture_statements = capture_statements
         self.from_start = from_start
         self.data_dir = Path(data_dir).expanduser().resolve()
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -182,6 +185,21 @@ class ChatObserver:
             );
             CREATE INDEX IF NOT EXISTS usage_records_turn_idx
                 ON usage_records(thread_id, turn_id);
+            CREATE TABLE IF NOT EXISTS statement_outbox(
+                source_offset INTEGER PRIMARY KEY,
+                source_bytes INTEGER NOT NULL,
+                source_sha256 TEXT NOT NULL,
+                message_id TEXT NOT NULL,
+                phase TEXT NOT NULL,
+                record_hash TEXT
+            );
+            CREATE TABLE IF NOT EXISTS statement_delivery_state(
+                id INTEGER PRIMARY KEY CHECK(id=1),
+                bytes_read INTEGER NOT NULL DEFAULT 0,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                error TEXT
+            );
+            INSERT OR IGNORE INTO statement_delivery_state(id) VALUES(1);
             """
         )
         columns = {item[1] for item in db.execute("PRAGMA table_info(observer_state)")}
@@ -376,6 +394,7 @@ class ChatObserver:
         }
 
     def _parse_line(self, raw):
+        exact_raw = raw
         raw = raw.rstrip(b"\r\n")
         if not raw:
             return "ignore", None
@@ -390,6 +409,19 @@ class ChatObserver:
             return "context", self._parse_context(record)
         if record_type == "token_usage_record":
             return "usage", self._parse_usage(record)
+        if record_type == 'response_item' and self.capture_statements:
+            message = record.get('payload')
+            if (isinstance(message, dict) and message.get('type') == 'message'
+                    and message.get('role') == 'assistant'
+                    and message.get('phase') in ('commentary', 'final_answer')):
+                message_id = message.get('id')
+                try:
+                    _text(message_id, 'statement id')
+                except (ObserverError, UnicodeError):
+                    return 'malformed', None
+                return 'statement', {'source_bytes': len(exact_raw),
+                    'source_sha256': hashlib.sha256(exact_raw).hexdigest(),
+                    'message_id': message_id, 'phase': message['phase']}
         # event_msg and every other native record are intentionally ignored;
         # in particular, their cumulative token counters are never summed.
         return "ignore", None
@@ -397,6 +429,7 @@ class ChatObserver:
     def _read_incremental(self, cursor, skipping_line, read_counter=None):
         contexts = []
         records = []
+        statements = []
         malformed = 0
         skipped_lines = 0
         consumed = 0
@@ -447,6 +480,8 @@ class ChatObserver:
                                     records.append(parsed)
                                 elif kind == "malformed":
                                     malformed += 1
+                                elif kind == 'statement':
+                                    statements.append({**parsed, 'source_offset': absolute_end - len(line)})
                                 line.clear()
                         position = end
         except OSError as exc:
@@ -454,6 +489,7 @@ class ChatObserver:
         return {
             "contexts": contexts,
             "records": records,
+            "statements": statements,
             "malformed": malformed,
             "skipped_lines": skipped_lines,
             "consumed": consumed,
@@ -469,6 +505,14 @@ class ChatObserver:
         ).fetchone()
 
     def _apply(self, db, parsed, row):
+        for statement in parsed.get('statements', []):
+            names = ('source_offset', 'source_bytes', 'source_sha256', 'message_id', 'phase')
+            old = db.execute('SELECT * FROM statement_outbox WHERE source_offset=?',
+                             (statement['source_offset'],)).fetchone()
+            if old and any(old[key] != statement[key] for key in names):
+                raise ObserverError('Statement source binding conflict')
+            db.execute('INSERT OR IGNORE INTO statement_outbox(' + ','.join(names) + ') VALUES(?,?,?,?,?)',
+                       tuple(statement[key] for key in names))
         current_model = row["model"]
         current_effort = row["effort"]
         for context in parsed["contexts"]:

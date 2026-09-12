@@ -66,31 +66,55 @@ class Runtime:
         self.research = False
         self.chat_observer = None
         self.observer_tree = None
+        self.statement_delivery = None
         self._chat_stop = threading.Event()
         self._chat_thread = None
         self._chat_error = None
         self._tree_error = None
+        self._statement_error = None
 
-    def attach_chat(self, rollout, thread_id):
-        """Observe native metadata only; never intercept or initiate inference."""
+    def attach_chat(self, rollout, thread_id, *, statement_project=None):
+        """Observe metadata; explicit project opt-in archives visible statements."""
         from .chat_observer import ChatObserver
         from .observer_tree import ObserverTree
         if self.chat_observer is not None:
             raise ValueError("A chat is already attached")
         self.chat_observer = ChatObserver(self.data_dir, rollout, thread_id)
+        factory = None
+        if statement_project is not None:
+            from .statement_memory import StatementMemory
+            from .statement_delivery import StatementDelivery
+            project = str(Path(statement_project).expanduser().resolve())
+            sink = StatementMemory(self.memory, project)
+            factory = lambda observer: StatementDelivery(observer, sink, project)
+            self.statement_delivery = factory(self.chat_observer)
         # Infer only from the explicitly attached native sessions hierarchy.
         # Custom rollout locations keep root observation but child lookup is
         # unavailable rather than searching unrelated directories.
         sessions = next((p for p in self.chat_observer.rollout_path.parents if p.name == 'sessions'), None)
-        self.observer_tree = ObserverTree(self.chat_observer, self.state, sessions.parent if sessions else None)
+        self.observer_tree = ObserverTree(self.chat_observer, self.state, sessions.parent if sessions else None,
+                                          statement_factory=factory)
 
         def watch():
             while not self._chat_stop.is_set():
+                self.chat_observer.capture_statements = False
+                self.observer_tree.capture_statements = False
                 try:
+                    capture = self.statement_delivery is not None and self.settings()['enabled']
+                    self.chat_observer.capture_statements = capture
+                    self.observer_tree.capture_statements = capture
                     self.chat_observer.scan()
                     self._chat_error = None
                 except Exception as exc:
                     self._chat_error = type(exc).__name__
+                if self.statement_delivery is not None:
+                    try:
+                        self.statement_delivery.drain()
+                        self._statement_error = None
+                    except Exception as exc:
+                        # Usage and child scans continue even if the separate
+                        # memory status database is unavailable.
+                        self._statement_error = type(exc).__name__
                 try:
                     self.observer_tree.scan()
                     self._tree_error = None
@@ -191,6 +215,12 @@ class Runtime:
         if self.chat_observer is not None:
             result["chat_observer"] = self.chat_observer.snapshot()
             result["chat_observer"]["worker_error"] = self._chat_error
+            if self.statement_delivery is not None:
+                try:
+                    result['statement_memory'] = self.statement_delivery.snapshot()
+                    result['statement_memory']['worker_error'] = self._statement_error
+                except Exception as exc:
+                    result['statement_memory'] = {'coverage': 'UNKNOWN', 'error': type(exc).__name__}
             if self.observer_tree is not None:
                 result['observer_tree'] = self.observer_tree.snapshot()
                 result['observer_tree']['worker_error'] = self._tree_error

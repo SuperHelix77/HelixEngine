@@ -175,3 +175,37 @@ def test_runtime_automatically_follows_child_from_existing_hook_events(tmp_path)
         assert result['worker_error'] is None
     finally:
         runtime.close()
+def test_child_statement_memory_uses_same_verified_tree_and_keeps_native_usage(tmp_path):
+    from helixengine.core.evidence import Store
+    from helixengine.core.workflow_memory import Memory
+    from helixengine.statement_memory import StatementMemory
+    from helixengine.statement_delivery import StatementDelivery
+    home, root, state, tree = fixture(tmp_path)
+    memory = Memory(Store(tmp_path / 'statement-evidence'))
+    sink = StatementMemory(memory, 'project')
+    tree.statement_factory = lambda observer: StatementDelivery(observer, sink, 'project')
+    tree.capture_statements = True
+    path = add_child(home, state)
+    append(path, {'type': 'response_item', 'payload': {'type': 'message', 'role': 'assistant',
+        'id': 'child-final', 'phase': 'final_answer', 'content': [{'type': 'output_text', 'text': 'Prior pass is stale.'}]}})
+    result = tree.scan()
+    assert result['children'][0]['statements']['delivered'] == 1
+    assert result['children'][0]['response_count'] == 1
+    records = memory.timeline('project', 'child')
+    assert len(records) == 1
+    assert b'Prior pass is stale.' in memory.retrieve('project', [records[0]['record_hash']])[0]['raw']
+    tree.scan()
+    assert len(memory.timeline('project', 'child')) == 1
+
+
+def test_child_memory_initialization_failure_does_not_stop_usage(tmp_path):
+    home, root, state, tree = fixture(tmp_path)
+    def broken_factory(observer):
+        raise OSError('memory unavailable')
+    tree.statement_factory = broken_factory
+    tree.capture_statements = True
+    add_child(home, state)
+    result = tree.scan()
+    assert result['response_count'] == 1
+    assert result['children'][0]['statements']['error'] == 'OSError'
+    assert result['children'][0]['import_pending'] == 0
