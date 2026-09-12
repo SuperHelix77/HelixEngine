@@ -2,7 +2,9 @@
 
 import json
 import hmac
+import os
 import signal
+import socket
 import threading
 import time
 import webbrowser
@@ -32,7 +34,7 @@ def _json(value):
 
 
 class HelixHTTPServer(ThreadingHTTPServer):
-    allow_reuse_address = True
+    allow_reuse_address = os.name != 'nt'
     daemon_threads = True
 
     def __init__(self, address, handler, runtime):
@@ -42,6 +44,10 @@ class HelixHTTPServer(ThreadingHTTPServer):
     def server_bind(self):
         # HTTPServer resolves its hostname synchronously. This server only
         # binds a literal loopback address; startup must not depend on DNS.
+        # Windows SO_REUSEADDR permits a second active listener, unlike
+        # POSIX. Claim the port exclusively so repeat launch opens the HUD.
+        if os.name == 'nt':
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
         TCPServer.server_bind(self)
         self.server_name, self.server_port = self.server_address[:2]
 
