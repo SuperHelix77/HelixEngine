@@ -132,6 +132,35 @@ def _recording_context(data_dir, thread_id):
                 'a decision that depends on earlier observations.'}}
 
 
+def _source_response(data_dir, cwd, state, binding, event_name):
+    """Offer configured evidence; optional preparation never blocks execution."""
+    started = time.perf_counter()
+    try:
+        from helixengine.core.evidence import Store
+        from helixengine.source_context import prepare
+        store = Store(Path(data_dir).expanduser().resolve() / 'evidence')
+        source = prepare(data_dir, cwd, store)
+        report = {**source['report'], 'store_io': dict(store.metrics),
+                  'preparation_seconds': time.perf_counter() - started}
+        if source.get('context'):
+            state.event('CODEX_SOURCE_CONTEXT_OFFERED',
+                        {**binding, 'report': report,
+                         'delivery': 'hook_response_not_wire_verified'})
+            return {'hookSpecificOutput': {
+                'hookEventName': event_name, 'additionalContext': source['context'],
+            }}
+        if source['report'].get('status') not in ('disabled', 'unconfigured'):
+            state.event('CODEX_SOURCE_CONTEXT_BYPASSED',
+                        {**binding, 'report': report})
+    except Exception as exc:
+        try:
+            state.event('CODEX_SOURCE_CONTEXT_BYPASSED',
+                        {**binding, 'error_type': type(exc).__name__})
+        except Exception:
+            pass
+    return {}
+
+
 def hook(event, data_dir, session_scope=None):
     from helixengine.state import State
     started = time.perf_counter()
@@ -169,7 +198,12 @@ def hook(event, data_dir, session_scope=None):
                         {**binding, 'capture': result, 'hook_seconds': time.perf_counter() - started})
             from helixengine.native_transitions import dispatch
             response = dispatch(data_dir, memory, result, native_event=event)
-            return response or _recording_context(data_dir, binding['thread_id'])
+            response = response or _recording_context(data_dir, binding['thread_id'])
+            # Preserve recording/recovery authority and its existing context.
+            # Source preload is optional evidence on ordinary native turns.
+            if response or not result.get('captured'):
+                return response
+            return _source_response(data_dir, str(Path(cwd).resolve()), state, binding, kind)
         except Exception as exc:
             _deactivate_recording(data_dir, binding['thread_id'])
             # Original submission remains native even if capture/publication
@@ -182,6 +216,10 @@ def hook(event, data_dir, session_scope=None):
         return _recording_context(data_dir, binding['thread_id'])
     if kind in ('SubagentStart', 'SubagentStop'):
         state.event('CODEX_' + kind.upper(), binding)
+        cwd = event.get('cwd')
+        if (kind == 'SubagentStart' and _identity(event.get('agent_id'))
+                and state.settings()['enabled'] and isinstance(cwd, str) and Path(cwd).is_dir()):
+            return _source_response(data_dir, str(Path(cwd).resolve()), state, binding, kind)
         return {}
     if kind != 'PreToolUse' or event.get('tool_name') != 'Bash':
         return {}

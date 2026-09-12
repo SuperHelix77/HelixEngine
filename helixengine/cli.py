@@ -46,6 +46,13 @@ def _parser():
     for action in ("install", "remove", "status"):
         target = codex_actions.add_parser(action)
         target.add_argument("--project", required=True, help="explicit existing project directory")
+    source = codex_actions.add_parser("source", help="opt in to bounded source evidence through the existing hook")
+    source_actions = source.add_subparsers(dest="source_action", required=True)
+    for action in ("set", "status", "clear"):
+        target = source_actions.add_parser(action)
+        target.add_argument("--project", required=True)
+        if action == "set":
+            target.add_argument("paths", nargs="+", help="explicit project-relative source files")
 
     run = commands.add_parser("run", help="execute one argv exactly once")
     run.add_argument("--kind", choices=("generic", "pytest", "compiler"), default="generic")
@@ -148,9 +155,18 @@ def _exit_code(result):
 def main(argv=None):
     args = _parser().parse_args(argv)
     if args.command == "codex":
-        from .codex_setup import configure
         try:
-            print(_json(configure(args.project, args.data_dir, action=args.codex_action)))
+            if args.codex_action == "source":
+                from . import source_context
+                if args.source_action == "status":
+                    result = source_context.status(args.data_dir, args.project)
+                else:
+                    paths = args.paths if args.source_action == "set" else []
+                    result = source_context.configure(args.data_dir, args.project, paths)
+                print(_json(result))
+            else:
+                from .codex_setup import configure
+                print(_json(configure(args.project, args.data_dir, action=args.codex_action)))
             return 0
         except (OSError, ValueError, TypeError) as exc:
             print(f"helixengine: {exc}", file=sys.stderr)

@@ -48,8 +48,11 @@ delivery, retaining counts, two failure references and exact archived stderr.
 
 ## Remaining boundary
 
-Source preparation was supplied as mock task/user-input data. Automatic source
-preparation in an ordinary desktop session remains unproven. The source write
+Correction from the next wire audit: the mock user input contained the task
+description, not the three project files' contents. The scripted provider knew
+the proposed repair independently. Preparing files on disk did not put those
+files in model context. Automatic source preparation in an ordinary desktop
+session remains unproven. The source write
 is an ordinary native batch operation; only the subsequent tests ran through
 Engine. This does not qualify transactional Engine publication, automatic session
 interception, or a Sol release median. A new hosted pair is not justified merely
