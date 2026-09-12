@@ -65,16 +65,24 @@ class Runtime:
         self._closed = False
         self.research = False
         self.chat_observer = None
+        self.observer_tree = None
         self._chat_stop = threading.Event()
         self._chat_thread = None
         self._chat_error = None
+        self._tree_error = None
 
     def attach_chat(self, rollout, thread_id):
         """Observe native metadata only; never intercept or initiate inference."""
         from .chat_observer import ChatObserver
+        from .observer_tree import ObserverTree
         if self.chat_observer is not None:
             raise ValueError("A chat is already attached")
         self.chat_observer = ChatObserver(self.data_dir, rollout, thread_id)
+        # Infer only from the explicitly attached native sessions hierarchy.
+        # Custom rollout locations keep root observation but child lookup is
+        # unavailable rather than searching unrelated directories.
+        sessions = next((p for p in self.chat_observer.rollout_path.parents if p.name == 'sessions'), None)
+        self.observer_tree = ObserverTree(self.chat_observer, self.state, sessions.parent if sessions else None)
 
         def watch():
             while not self._chat_stop.is_set():
@@ -83,6 +91,11 @@ class Runtime:
                     self._chat_error = None
                 except Exception as exc:
                     self._chat_error = type(exc).__name__
+                try:
+                    self.observer_tree.scan()
+                    self._tree_error = None
+                except Exception as exc:
+                    self._tree_error = type(exc).__name__
                 self._chat_stop.wait(1)
 
         self._chat_thread = threading.Thread(target=watch, name="helix-chat-observer", daemon=True)
@@ -178,6 +191,9 @@ class Runtime:
         if self.chat_observer is not None:
             result["chat_observer"] = self.chat_observer.snapshot()
             result["chat_observer"]["worker_error"] = self._chat_error
+            if self.observer_tree is not None:
+                result['observer_tree'] = self.observer_tree.snapshot()
+                result['observer_tree']['worker_error'] = self._tree_error
         try:
             result['receipt_memory'] = self.memory_status()
         except Exception as exc:

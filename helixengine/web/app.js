@@ -534,6 +534,7 @@ function renderChat() {
   if (!chat) { $('chat-health').textContent = 'No chat attached. Release service remains separate.'; return; }
   $('chat-health').textContent = `${chat.connected ? 'ATTACHED' : 'ATTENTION'} · ${text(chat.thread_id)} · ${chat.worker_error || chat.error || 'read-only'} · scan ${dateTime(chat.last_scan, 'pending')}`;
   const usage = chat.usage || {};
+  const tree = state.snapshot.observer_tree;
   const facts = [
     ['Current model / effort', `${text(chat.model)} / ${text(chat.effort)}`],
     ['Native responses since attachment', formatInteger(chat.response_count)],
@@ -547,6 +548,13 @@ function renderChat() {
     ['Receipt coverage since attachment', chat.coverage_complete === true ? 'Complete for supported records' : 'INCOMPLETE — inspect observer error'],
     ['Savings / capability parity', 'UNMEASURED for this chat']
   ];
+  if (tree) facts.push(
+    ['Discovered children', formatInteger(tree.child_count)],
+    ['Root + child input (observed windows)', formatInteger(tree.usage?.input_tokens)],
+    ['Root + child output (observed windows)', formatInteger(tree.usage?.output_tokens)],
+    ['Child source gaps', `${(tree.children || []).filter(c => c.error || c.connected !== true || !c.coverage_complete || c.import_pending !== 0).length} · ${tree.worker_error || tree.discovery_error || 'no discovery error'}`],
+    ['Complete-workflow accounting', 'NOT ESTABLISHED — root attachment and child history windows differ']
+  );
   $('chat-metrics').replaceChildren(...facts.map(([label, value]) => {
     const row = element('p'); row.append(element('span', `${label}: `), element('strong', value)); return row;
   }));

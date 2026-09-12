@@ -111,7 +111,10 @@ class ChatObserver:
     JSON payload columns.
     """
 
-    def __init__(self, data_dir, rollout_path, thread_id):
+    def __init__(self, data_dir, rollout_path, thread_id, *, from_start=False):
+        if type(from_start) is not bool:
+            raise ObserverError('Boolean history opt-in required')
+        self.from_start = from_start
         self.data_dir = Path(data_dir).expanduser().resolve()
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.rollout_path = Path(rollout_path).expanduser().resolve()
@@ -263,7 +266,7 @@ class ChatObserver:
                     seen = connected = 0
                     error = "rollout unavailable"
                 else:
-                    cursor = int(source.st_size)
+                    cursor = 0 if self.from_start else int(source.st_size)
                     file_dev, file_ino = _identity_from_stat(source)
                     bootstrap_reads = [0]
                     anchor = self._anchor(cursor, bootstrap_reads)

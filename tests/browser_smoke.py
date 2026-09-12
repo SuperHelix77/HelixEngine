@@ -91,6 +91,14 @@ def main():
                 page.set_viewport_size({'width':390,'height':844})
                 assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
                 page.screenshot(path=str(args.output/'mobile.png'),full_page=True)
+                # Rendering-only fixture: backend/native receipt reconciliation
+                # is covered separately. Do not present these values as usage.
+                page.evaluate("""state.snapshot.hub_mode='research';
+                    state.snapshot.chat_observer={connected:true,thread_id:'fixture-root',usage:{},recent:[]};
+                    state.snapshot.observer_tree={child_count:1,usage:{input_tokens:300,output_tokens:20},
+                        children:[{connected:true,coverage_complete:true,import_pending:0}]}; renderChat();""")
+                expect(page.locator('#chat-metrics')).to_contain_text('Root + child input (observed windows): 300')
+                expect(page.locator('#chat-metrics')).to_contain_text('NOT ESTABLISHED')
                 assert errors==[],errors
                 browser.close()
                 (args.output/'RESULT.json').write_text(json.dumps({'passed':True,'checks':['actual HTTP switch roundtrip','SSE running and completed events','receipt memory API and HUD','Luna rejected capsule retained','model filter','pause/resume','CSRF-free operational export','research route absent','expired tariff withheld','mobile overflow','no browser exceptions']},indent=2)+'\n')

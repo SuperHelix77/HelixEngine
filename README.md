@@ -192,6 +192,10 @@ Use `helixengine memory status` to inspect backlog/gaps and
 execution. See [automatic receipt memory](docs/RECEIPT_MEMORY.md) for attribution,
 failure behavior and the limits of this integration.
 
+An attached native research session also follows discovered child usage receipts
+through the same observer parser. See [parent and child accounting](docs/CHILD_USAGE.md)
+for scope, native registry compatibility, deduplication and explicit coverage gaps.
+
 The bundled `release_evidence` directory contains hash-bound public capsules
 and their qualification limits. It is not a research ledger, provider
 attestation, or proof of model-wide parity. This release only observes
