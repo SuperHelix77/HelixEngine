@@ -29,7 +29,6 @@ _READ_CHUNK_BYTES = 64 * 1024
 _ANCHOR_BYTES = 64
 _CONTENT_BUDGET = MAX_SCAN_BYTES - (3 * _ANCHOR_BYTES)
 _UNKNOWN = "UNKNOWN"
-_COVERAGE_WARNING = "coverage incomplete: oversized rollout line skipped"
 _USAGE_KEYS = (
     "input_tokens",
     "cached_input_tokens",
@@ -191,6 +190,30 @@ class ChatObserver:
             db.execute(
                 "ALTER TABLE observer_state ADD COLUMN skipped_oversized_lines INTEGER NOT NULL DEFAULT 0"
             )
+        for name, declaration in (
+            ("start_cursor", "INTEGER"),
+            ("malformed_lines", "INTEGER NOT NULL DEFAULT 0"),
+            ("initial_partial_line", "INTEGER NOT NULL DEFAULT 0"),
+            ("initial_source_missing", "INTEGER NOT NULL DEFAULT 0"),
+        ):
+            if name not in columns:
+                db.execute(f"ALTER TABLE observer_state ADD COLUMN {name} {declaration}")
+        # Older databases did not retain the attachment boundary or durable
+        # malformed-line counts. Do not infer complete coverage from them.
+        db.execute(
+            "UPDATE observer_state SET coverage_complete=0 WHERE start_cursor IS NULL"
+        )
+
+    def _partial_boundary(self, cursor, read_counter):
+        if cursor == 0:
+            return False
+        with self.rollout_path.open("rb") as stream:
+            stream.seek(cursor - 1)
+            last = stream.read(1)
+        read_counter[0] += len(last)
+        if not last:
+            raise ObserverError("rollout source truncated")
+        return last != b"\n"
 
     def _source_stat(self):
         try:
@@ -270,10 +293,19 @@ class ChatObserver:
                     ),
                 )
                 if source is not None and bootstrap_reads[0]:
+                    partial = self._partial_boundary(cursor, bootstrap_reads)
                     db.execute(
-                        "UPDATE observer_state SET bytes_read=? WHERE id=1",
-                        (bootstrap_reads[0],),
+                        """UPDATE observer_state SET bytes_read=?, start_cursor=?,
+                            skipping_line=?, initial_partial_line=?, coverage_complete=?,
+                            error=? WHERE id=1""",
+                        (bootstrap_reads[0], cursor, int(partial), int(partial),
+                         int(not partial), "coverage incomplete: attached within a record" if partial else None),
                     )
+                elif source is not None:
+                    db.execute("UPDATE observer_state SET start_cursor=0 WHERE id=1")
+                else:
+                    db.execute("""UPDATE observer_state SET initial_source_missing=1,
+                        coverage_complete=0 WHERE id=1""")
                 db.execute("COMMIT")
             except BaseException:
                 db.execute("ROLLBACK")
@@ -346,7 +378,7 @@ class ChatObserver:
             return "ignore", None
         try:
             record = json.loads(raw)
-        except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
+        except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError, RecursionError):
             return "malformed", None
         if not isinstance(record, dict):
             return "ignore", None
@@ -587,14 +619,19 @@ class ChatObserver:
                         if not row["seen"]:
                             cursor = int(source.st_size)
                             anchor = self._anchor(cursor, read_counter)
+                            partial = self._partial_boundary(cursor, read_counter)
                             file_dev, file_ino = _identity_from_stat(source)
                             db.execute(
                                 """
-                                UPDATE observer_state SET connected=1, error=NULL,
+                                UPDATE observer_state SET connected=1,
                                     fatal=0, seen=1, cursor=?, file_dev=?, file_ino=?,
-                                    anchor=?, bytes_read=bytes_read+?, last_scan=? WHERE id=1
+                                    anchor=?, bytes_read=bytes_read+?, last_scan=?,
+                                    start_cursor=?, skipping_line=?, initial_partial_line=?,
+                                    coverage_complete=?, error=? WHERE id=1
                                 """,
-                                (cursor, file_dev, file_ino, anchor, read_counter[0], now),
+                                (cursor, file_dev, file_ino, anchor, read_counter[0], now,
+                                 cursor, int(partial), int(partial), 0,
+                                 "coverage incomplete: source unavailable at attachment"),
                             )
                             db.execute("COMMIT")
                             return self.snapshot()
@@ -619,12 +656,20 @@ class ChatObserver:
                         model, effort = self._apply(db, parsed, row)
                         coverage_incomplete = (
                             not bool(row["coverage_complete"]) or parsed["skipped_lines"] > 0
+                            or parsed["malformed"] > 0
                         )
-                        error = (
-                            _COVERAGE_WARNING
-                            if coverage_incomplete
-                            else "skipped malformed rollout line" if parsed["malformed"] else None
-                        )
+                        gaps = []
+                        if row["start_cursor"] is None:
+                            gaps.append("attachment boundary unknown")
+                        if row["initial_partial_line"]:
+                            gaps.append("attached within a record")
+                        if row["initial_source_missing"]:
+                            gaps.append("source unavailable at attachment")
+                        if row["skipped_oversized_lines"] + parsed["skipped_lines"]:
+                            gaps.append("oversized rollout line skipped")
+                        if row["malformed_lines"] + parsed["malformed"]:
+                            gaps.append("malformed rollout line skipped")
+                        error = "coverage incomplete: " + "; ".join(gaps or ["prior gap"]) if coverage_incomplete else None
                         db.execute(
                             """
                             UPDATE observer_state SET connected=1, error=?, fatal=0,
@@ -632,19 +677,21 @@ class ChatObserver:
                                 file_dev=?, file_ino=?, anchor=?, skipping_line=?,
                                 seen=1, coverage_complete=?,
                                 skipped_oversized_lines=skipped_oversized_lines+?,
+                                malformed_lines=malformed_lines+?,
                                 model=?, effort=? WHERE id=1
                             """,
                             (
                                 error,
                                 now,
                                 parsed["cursor"],
-                                parsed["consumed"],
+                                read_counter[0],
                                 int(after.st_dev),
                                 int(after.st_ino),
                                 new_anchor,
                                 int(parsed["skipping_line"]),
                                 int(not coverage_incomplete),
                                 parsed["skipped_lines"],
+                                parsed["malformed"],
                                 model,
                                 effort,
                             ),
@@ -740,6 +787,10 @@ class ChatObserver:
                     "cursor": int(row["cursor"]),
                     "coverage_complete": bool(row["coverage_complete"]),
                     "skipped_oversized_lines": int(row["skipped_oversized_lines"]),
+                    "malformed_lines": int(row["malformed_lines"]),
+                    "start_cursor": row["start_cursor"],
+                    "initial_partial_line": bool(row["initial_partial_line"]),
+                    "initial_source_missing": bool(row["initial_source_missing"]),
                 }
                 db.execute("COMMIT")
                 return result

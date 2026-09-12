@@ -537,6 +537,8 @@ function renderChat() {
     ['Output tokens (includes reasoning)', formatInteger(usage.output_tokens)],
     ['Reasoning subset', formatInteger(usage.reasoning_output_tokens)],
     ['Observer bytes read', formatInteger(chat.bytes_read)],
+    ['Observation start byte', Number.isInteger(chat.start_cursor) ? formatInteger(chat.start_cursor) : 'UNKNOWN — legacy attachment'],
+    ['Skipped oversized / malformed records', `${formatInteger(chat.skipped_oversized_lines)} / ${formatInteger(chat.malformed_lines)}`],
     ['Receipt coverage since attachment', chat.coverage_complete === true ? 'Complete for supported records' : 'INCOMPLETE — inspect observer error'],
     ['Savings / capability parity', 'UNMEASURED for this chat']
   ];

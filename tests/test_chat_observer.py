@@ -72,7 +72,8 @@ def test_first_attach_is_eof_partial_writes_are_incremental_and_restart_is_durab
     assert initial["usage"]["total_tokens"] == 0
     assert initial["cursor"] == rollout.stat().st_size
     assert initial["connected"] is True
-    assert initial["bytes_read"] == min(64, initial["cursor"])
+    assert initial["bytes_read"] == min(64, initial["cursor"]) + 1
+    assert initial["start_cursor"] == initial["cursor"]
 
     record = usage_record("response-1")
     raw = json.dumps(record, separators=(",", ":")).encode()
@@ -185,6 +186,84 @@ def test_invalid_counters_roll_back_cursor_and_records(tmp_path):
     assert snapshot["usage"]["total_tokens"] == 0
 
 
+def test_malformed_gap_survives_clean_scan_and_restart(tmp_path):
+    rollout = tmp_path / "rollout.jsonl"
+    rollout.touch()
+    observer = ChatObserver(tmp_path / "observer", rollout, THREAD)
+    rollout.write_bytes(b'{"type":"token_usage_record",BROKEN}\n')
+    snapshot = observer.scan()
+    assert snapshot["malformed_lines"] == 1
+    assert snapshot["coverage_complete"] is False
+    assert "malformed" in snapshot["error"]
+    append_record(rollout, usage_record())
+    restarted = ChatObserver(tmp_path / "observer", rollout, THREAD)
+    snapshot = restarted.scan()
+    assert snapshot["response_count"] == 1
+    assert snapshot["malformed_lines"] == 1
+    assert snapshot["coverage_complete"] is False
+    assert "malformed" in restarted.scan()["error"]
+
+
+def test_unavailable_attachment_cannot_claim_coverage_of_skipped_history(tmp_path):
+    rollout = tmp_path / "not-yet-created.jsonl"
+    observer = ChatObserver(tmp_path / "observer", rollout, THREAD)
+    assert observer.snapshot()["coverage_complete"] is False
+    append_record(rollout, usage_record("before-readable"))
+    snapshot = observer.scan()
+    assert snapshot["response_count"] == 0
+    assert snapshot["start_cursor"] == rollout.stat().st_size
+    assert snapshot["initial_source_missing"] is True
+    append_record(rollout, usage_record("after-readable"))
+    snapshot = ChatObserver(tmp_path / "observer", rollout, THREAD).scan()
+    assert snapshot["response_count"] == 1
+    assert snapshot["coverage_complete"] is False
+    assert "source unavailable at attachment" in snapshot["error"]
+
+
+def test_attach_inside_record_skips_suffix_and_keeps_gap_after_restart(tmp_path):
+    rollout = tmp_path / "rollout.jsonl"
+    raw = json.dumps(usage_record("in-progress")).encode()
+    rollout.write_bytes(raw[:80])
+    observer = ChatObserver(tmp_path / "observer", rollout, THREAD)
+    assert observer.snapshot()["start_cursor"] == 80
+    with rollout.open("ab") as stream:
+        stream.write(raw[80:] + b"\n")
+    append_record(rollout, usage_record("next"))
+    snapshot = ChatObserver(tmp_path / "observer", rollout, THREAD).scan()
+    assert snapshot["response_count"] == 1
+    assert snapshot["malformed_lines"] == 0
+    assert snapshot["initial_partial_line"] is True
+    assert snapshot["coverage_complete"] is False
+    assert "attached within a record" in snapshot["error"]
+
+
+def test_legacy_unknown_boundary_is_not_guessed_on_restart(tmp_path):
+    rollout = tmp_path / "rollout.jsonl"
+    rollout.touch()
+    observer = ChatObserver(tmp_path / "observer", rollout, THREAD)
+    append_record(rollout, usage_record())
+    observer.scan()
+    with observer._db() as db:
+        # Emulate the nullable migrated value from an older database.
+        db.execute("UPDATE observer_state SET start_cursor=NULL")
+    snapshot = ChatObserver(tmp_path / "observer", rollout, THREAD).scan()
+    assert snapshot["start_cursor"] is None
+    assert snapshot["response_count"] == 1
+    assert snapshot["coverage_complete"] is False
+    assert "attachment boundary unknown" in snapshot["error"]
+
+
+def test_successful_scans_charge_anchor_reads_including_idle_checks(tmp_path):
+    rollout = tmp_path / "rollout.jsonl"
+    rollout.touch()
+    observer = ChatObserver(tmp_path / "observer", rollout, THREAD)
+    append_record(rollout, usage_record())
+    snapshot = observer.scan()
+    assert snapshot["bytes_read"] == rollout.stat().st_size + 64
+    idle = observer.scan()
+    assert idle["bytes_read"] - snapshot["bytes_read"] == 128
+
+
 def test_oversized_line_is_skipped_without_unbounded_read_or_text_retention(tmp_path):
     rollout = tmp_path / "rollout.jsonl"
     rollout.touch()
@@ -200,6 +279,10 @@ def test_oversized_line_is_skipped_without_unbounded_read_or_text_retention(tmp_
     assert snapshot["response_count"] == 0
     assert snapshot["bytes_read"] <= MAX_SCAN_BYTES
     assert snapshot["cursor"] < rollout.stat().st_size
+    assert snapshot["coverage_complete"] is False
+    assert snapshot["skipped_oversized_lines"] == 1
+    restarted = ChatObserver(tmp_path / "observer", rollout, THREAD)
+    snapshot = restarted.scan()
     assert snapshot["coverage_complete"] is False
     assert snapshot["skipped_oversized_lines"] == 1
     for stored in (observer.db_path, *observer.db_path.parent.glob(observer.db_path.name + "-*")):
