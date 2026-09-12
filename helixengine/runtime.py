@@ -178,6 +178,10 @@ class Runtime:
         if self.chat_observer is not None:
             result["chat_observer"] = self.chat_observer.snapshot()
             result["chat_observer"]["worker_error"] = self._chat_error
+        try:
+            result['receipt_memory'] = self.memory_status()
+        except Exception as exc:
+            result['receipt_memory'] = {'coverage': 'UNKNOWN', 'error': f'{type(exc).__name__}: {exc}'}
         return result
 
     def settings(self):
@@ -191,7 +195,7 @@ class Runtime:
         if kind not in ("generic", "pytest", "compiler"):
             raise ValueError("Unknown command kind")
 
-    def run(self, argv, cwd=None, *, kind="generic", timeout=None, environment_id="helix-cli", native_process_group=False):
+    def run(self, argv, cwd=None, *, kind="generic", timeout=None, environment_id="helix-cli", native_process_group=False, origin=None):
         """Run one native command and retain exact raw streams.
 
         The setting is copied into the run before the child starts.  Reduction
@@ -216,7 +220,7 @@ class Runtime:
         cwd = Path(cwd).expanduser().resolve(strict=True)
         if not cwd.is_dir():
             raise ValueError("Working directory required")
-        row = self.state.begin(list(argv), cwd)
+        row = self.state.begin(list(argv), cwd, origin)
         run_id = row["id"]
         started = time.perf_counter()
 
@@ -324,6 +328,15 @@ class Runtime:
             )
         except Exception as exc:
             publication_error = f"Telemetry publication failed: {type(exc).__name__}: {exc}"
+        memory_result = None
+        if enabled and publication_error is None:
+            # Completion is already durable. Indexing/recovery can never repeat
+            # the command or change its exit status/delivered evidence.
+            try:
+                memory_result = self.memory_sync()
+            except Exception as exc:
+                memory_result = {'error': f'{type(exc).__name__}: {exc}',
+                                 'coverage': 'UNKNOWN'}
         return {
             "run": row,
             "receipt": receipt_key,
@@ -331,10 +344,25 @@ class Runtime:
             "stdout": raw_stdout,
             "stderr": raw_stderr,
             "publication_error": publication_error,
+            "memory": memory_result,
             "exit_code": exit_code,
             "timed_out": receipt["timed_out"],
             "interrupted": receipt.get("interrupted", False),
         }
+
+    def memory_sync(self, limit=16):
+        from .memory_lifecycle import ReceiptMemory
+        result = ReceiptMemory(self.state, self.memory).drain(limit)
+        try:
+            self._telemetry('MEMORY_RECEIPTS_SYNCED', result)
+        except Exception:
+            # Durable cursor/status is still available. No execution recovery.
+            result['telemetry_error'] = 'Memory sync telemetry unavailable'
+        return result
+
+    def memory_status(self):
+        from .memory_lifecycle import ReceiptMemory
+        return ReceiptMemory(self.state, self.memory).status()
 
     def retrieve(self, receipt, stream, start=None, end=None):
         return self.store.retrieve(receipt, stream, start, end)

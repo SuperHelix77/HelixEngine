@@ -134,7 +134,7 @@ class State:
             raise ValueError("Nonempty string argv required")
         return list(argv)
 
-    def begin(self, argv, cwd):
+    def begin(self, argv, cwd, origin=None):
         argv = self._validate_argv(argv)
         cwd = str(cwd)
         _identity(cwd, "cwd")
@@ -151,6 +151,12 @@ class State:
             "stdout_bytes": 0,
             "stderr_bytes": 0,
         }
+        if origin is not None:
+            if not isinstance(origin, dict) or any(not isinstance(k, str) or
+                    not isinstance(v, str) or not v or '\x00' in v or
+                    len(v.encode()) > 4096 for k, v in origin.items()):
+                raise ValueError('Bound origin strings required')
+            row['origin'] = dict(origin)
         self.update(row, "RUN_STARTED")
         return row
 

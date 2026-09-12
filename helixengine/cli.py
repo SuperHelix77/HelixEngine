@@ -64,6 +64,9 @@ def _parser():
 
     memory = commands.add_parser("memory", help="operate on exact project-scoped memory records")
     memory_commands = memory.add_subparsers(dest="memory_command", required=True)
+    memory_commands.add_parser('status', help='show receipt-index cursor, backlog and gaps')
+    sync = memory_commands.add_parser('sync', help='index a bounded receipt batch without executing commands')
+    sync.add_argument('--limit', type=int, default=16)
     record = memory_commands.add_parser("record")
     record.add_argument("project")
     record.add_argument("session")
@@ -198,7 +201,13 @@ def main(argv=None):
             print(_json(runtime.usage_import(args.run_id, args.receipt_json)))
             return 0
         if args.command == "memory":
-            if args.memory_command == "record":
+            if args.memory_command == 'status':
+                print(_json(runtime.memory_status()))
+            elif args.memory_command == 'sync':
+                report = runtime.memory_sync(args.limit)
+                print(_json(report))
+                return 1 if report.get('error') else 0
+            elif args.memory_command == "record":
                 raw = sys.stdin.buffer.read() if args.file == "-" else Path(args.file).expanduser().read_bytes()
                 print(_json(runtime.memory_record(args.project, args.session, args.event_id, raw)))
             elif args.memory_command == "search":

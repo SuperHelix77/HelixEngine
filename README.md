@@ -185,6 +185,13 @@ needed. Fields that were not measured remain absent or null. Logical
 application byte counts do not measure physical SSD traffic, metadata, cache
 traffic, CPU, network traffic, or full effective cost.
 
+With Engine ON, completed routed commands also index small historical receipt
+references in the shared memory store, without copying or summarizing raw logs.
+Use `helixengine memory status` to inspect backlog/gaps and
+`helixengine memory sync --limit 16` for bounded recovery without command
+execution. See [automatic receipt memory](docs/RECEIPT_MEMORY.md) for attribution,
+failure behavior and the limits of this integration.
+
 The bundled `release_evidence` directory contains hash-bound public capsules
 and their qualification limits. It is not a research ledger, provider
 attestation, or proof of model-wide parity. This release only observes

@@ -410,11 +410,16 @@ function renderRuntime() {
   const details = $('runtime-details');
   details.replaceChildren();
   const settings = state.snapshot?.settings || {};
+  const memory = state.snapshot?.receipt_memory || {};
   const values = [
     ['Application version', state.snapshot?.app_version],
     ['Settings revision', number(settings.revision) == null ? '—' : formatInteger(settings.revision)],
     ['Storage bytes', storage.bytes],
     ['Storage objects', storage.objects],
+    ['Receipt memory', memory.error ? `GAP: ${memory.error}` : memory.coverage || 'Unknown'],
+    ['Pending receipt events', number(memory.backlog) == null ? 'Unknown' : formatInteger(memory.backlog)],
+    ['Last memory batch', memory.last_batch?.wall_seconds == null ? 'Unknown' : `${(memory.last_batch.wall_seconds * 1000).toFixed(1)} ms`],
+    ['Last memory index bytes', number(memory.last_batch?.index_input_bytes) == null ? 'Unknown' : formatInteger(memory.last_batch.index_input_bytes)],
     ['Last snapshot', dateTime(state.snapshot?.observed_at, 'Unknown')]
   ];
   for (const [label, value] of values) {

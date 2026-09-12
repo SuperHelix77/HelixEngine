@@ -65,6 +65,11 @@ def main():
                 child.communicate(timeout=15)
                 assert child.returncode==0
                 expect(page.locator('#run-list')).to_contain_text('COMPLETED')
+                expect(page.locator('#runtime-details')).to_contain_text('Receipt memory')
+                expect(page.locator('#runtime-details')).to_contain_text('historical_receipts_only')
+                with urlopen(url+'/api/release-state') as r:
+                    memory = json.load(r)['receipt_memory']
+                    assert memory['cursor'] > 0 and memory['backlog'] == 0 and memory['error'] is None
                 page.locator('#pause').click()
                 assert page.locator('#pause').inner_text()=='Resume view'
                 page.locator('#pause').click()
@@ -88,7 +93,7 @@ def main():
                 page.screenshot(path=str(args.output/'mobile.png'),full_page=True)
                 assert errors==[],errors
                 browser.close()
-                (args.output/'RESULT.json').write_text(json.dumps({'passed':True,'checks':['actual HTTP switch roundtrip','SSE running and completed events','Luna rejected capsule retained','model filter','pause/resume','CSRF-free operational export','research route absent','expired tariff withheld','mobile overflow','no browser exceptions']},indent=2)+'\n')
+                (args.output/'RESULT.json').write_text(json.dumps({'passed':True,'checks':['actual HTTP switch roundtrip','SSE running and completed events','receipt memory API and HUD','Luna rejected capsule retained','model filter','pause/resume','CSRF-free operational export','research route absent','expired tariff withheld','mobile overflow','no browser exceptions']},indent=2)+'\n')
         finally:
             if child is not None and child.poll() is None:
                 child.kill();child.communicate()

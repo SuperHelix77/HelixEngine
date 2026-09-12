@@ -32,6 +32,7 @@ class Memory:
               project TEXT NOT NULL,session TEXT NOT NULL,event_id TEXT NOT NULL,
               record_hash TEXT NOT NULL UNIQUE,UNIQUE(project,session,event_id));
             CREATE VIRTUAL TABLE IF NOT EXISTS search USING fts5(body);
+            CREATE INDEX IF NOT EXISTS events_identity ON events(event_id);
             ''')
 
     @contextmanager
@@ -42,8 +43,9 @@ class Memory:
             yield connection
         finally:connection.close()
 
-    def record(self,project,session,event_id,raw):
+    def record(self,project,session,event_id,raw,*,global_identity=False):
         identity(project,session,event_id)
+        if type(global_identity) is not bool:raise ValueError('Boolean global identity required')
         if not isinstance(raw,bytes):raise ValueError('Exact bytes required')
         start=time.perf_counter()
         source=self.store.put(raw)
@@ -54,6 +56,9 @@ class Memory:
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
             try:
+                if global_identity:
+                    existing=db.execute('SELECT record_hash FROM events WHERE event_id=?',(event_id,)).fetchall()
+                    if any(row[0]!=ref for row in existing):raise ValueError('Global event identity collision')
                 row=db.execute('SELECT record_hash FROM events WHERE project=? AND session=? AND event_id=?',
                                (project,session,event_id)).fetchone()
                 if row and row[0]!=ref:raise ValueError('Event identity collision')

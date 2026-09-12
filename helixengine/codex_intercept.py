@@ -219,7 +219,9 @@ def execute(encoded):
         if type(binding_ordinal) is not int or binding_ordinal != leaf_ordinal or not 0 <= binding_ordinal < MAX_COMPOUND_LEAVES:
             raise ValueError('Invalid binding leaf ordinal')
         identity = 'codex:' + binding.get('thread_id', binding.get('agent_id', binding['session_id'])) + ':' + binding.get('tool_use_id', 'UNKNOWN') + ':leaf:' + str(leaf_ordinal)
-        result = runtime.run(argv, native_cwd, kind=spec['kind'], environment_id=identity, native_process_group=True)
+        origin = {k: binding[k] for k in ('session_id', 'thread_id', 'agent_id',
+                  'tool_use_id', 'hook_cwd', 'execution_cwd', 'model') if isinstance(binding.get(k), str) and binding[k]}
+        result = runtime.run(argv, native_cwd, kind=spec['kind'], environment_id=identity, native_process_group=True, origin=origin)
         if result.get('publication_error'):
             sys.stderr.write('Helix: evidence/telemetry publication incomplete; raw result retained; no retry.\n')
         try:
