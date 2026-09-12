@@ -248,6 +248,8 @@ def test_changed_source_is_rebound_to_new_exact_reference(tmp_path, monkeypatch)
         return stamp
     monkeypatch.setattr(source_context, '_path_stamp', traced_stamp)
     two = source_context.prepare(data, project, store)
+    if two['context'] is None:
+        print('SOURCE_STAT_DIAGNOSTIC=' + json.dumps(stamps))
     assert two['context'] is not None, {'report': two['report'], 'stamps': stamps}
     first_entry = json.loads(one["context"])["files"][0]
     second_entry = json.loads(two["context"])["files"][0]
