@@ -19,6 +19,156 @@ def test_router_preserves_unknown_and_shell_semantics():
     assert route('python3 -m pytest -q')['kind'] == 'pytest'
 
 
+def test_router_compound_is_strict_and_preserves_leaf_spelling():
+    selected = route('git status --short  &&  git diff --stat')
+    assert [leaf['source'] for leaf in selected['leaves']] == [
+        'git status --short  ',
+        '  git diff --stat',
+    ]
+    for command in [
+        'git status ' + 'x' * 32750 + ' && git status',
+        'git status && echo unknown',
+        'git status || git diff',
+        'git status ; git diff',
+        'git status | git diff',
+        'git status > out && git diff',
+        'FOO=bar git status && git diff',
+        'git "status && still quoted" && git diff',
+        "git 'status && still quoted' && git diff",
+        'git status && git diff &&& git log',
+    ]:
+        assert route(command) is None
+
+
+def _fake_rg(bin_dir, marker, fail_arg=None):
+    executable = bin_dir / 'rg'
+    failure = '' if fail_arg is None else f'\nif sys.argv[1] == {fail_arg!r}: sys.exit(7)\n'
+    executable.write_text(
+        '#!' + sys.executable + '\n'
+        'import os, pathlib, sys\n'
+        'pathlib.Path(os.environ["HELIX_CHAIN_MARKER"]).open("a").write(sys.argv[1] + "\\n")\n'
+        'sys.stdout.write(sys.argv[1] + "\\n")\n' + failure
+    )
+    executable.chmod(0o755)
+    return marker
+
+
+def test_compound_engine_leaves_run_once_in_order_with_bounded_identity(tmp_path, monkeypatch):
+    bin_dir = tmp_path / 'bin'
+    bin_dir.mkdir()
+    marker = tmp_path / 'order'
+    _fake_rg(bin_dir, marker)
+    monkeypatch.setenv('PATH', str(bin_dir) + os.pathsep + os.environ['PATH'])
+    monkeypatch.setenv('HELIX_CHAIN_MARKER', str(marker))
+    event = {
+        'hook_event_name': 'PreToolUse',
+        'tool_name': 'Bash',
+        'session_id': 'parent-session',
+        'agent_id': 'child-thread',
+        'turn_id': 'turn-1',
+        'tool_use_id': 'same-tool-use',
+        'cwd': str(tmp_path),
+        'tool_input': {'command': 'rg first && rg second'},
+    }
+    rewritten = hook(event, tmp_path / 'data')['hookSpecificOutput']['updatedInput']['command']
+    assert rewritten.count('command -v') == 4
+    proc = subprocess.run(['/bin/sh', '-c', rewritten], cwd=tmp_path, capture_output=True)
+    assert proc.returncode == 0
+    assert proc.stdout == b'first\nsecond\n' and proc.stderr == b''
+    assert marker.read_text() == 'first\nsecond\n'
+
+    state = State(tmp_path / 'data').snapshot()
+    assert state['total_runs'] == 2
+    with State(tmp_path / 'data').db() as db:
+        executed = [
+            json.loads(row['body'])
+            for row in db.execute(
+                "SELECT body FROM events WHERE kind='CODEX_EXECUTED' ORDER BY id"
+            )
+        ]
+    assert [item['leaf_ordinal'] for item in executed] == [0, 1]
+    assert all(item['thread_id'] == 'child-thread' for item in executed)
+    assert all(item['tool_use_id'] == 'same-tool-use' for item in executed)
+    runtime = Runtime(tmp_path / 'data')
+    try:
+        identities = {
+            runtime.store.receipt(row['receipt'])['environment_id']
+            for row in state['runs']
+        }
+    finally:
+        runtime.close()
+    assert identities == {
+        'codex:child-thread:same-tool-use:leaf:0',
+        'codex:child-thread:same-tool-use:leaf:1',
+    }
+
+
+def test_compound_engine_keeps_shell_short_circuit_on_nonzero_leaf(tmp_path, monkeypatch):
+    bin_dir = tmp_path / 'bin'
+    bin_dir.mkdir()
+    marker = tmp_path / 'order'
+    _fake_rg(bin_dir, marker, fail_arg='first')
+    monkeypatch.setenv('PATH', str(bin_dir) + os.pathsep + os.environ['PATH'])
+    monkeypatch.setenv('HELIX_CHAIN_MARKER', str(marker))
+    event = {
+        'hook_event_name': 'PreToolUse',
+        'tool_name': 'Bash',
+        'session_id': 'session',
+        'tool_use_id': 'tool',
+        'cwd': str(tmp_path),
+        'tool_input': {'command': 'rg first && rg second'},
+    }
+    rewritten = hook(event, tmp_path / 'data')['hookSpecificOutput']['updatedInput']['command']
+    proc = subprocess.run(['/bin/sh', '-c', rewritten], cwd=tmp_path, capture_output=True)
+    assert proc.returncode == 7 and proc.stdout == b'first\n' and proc.stderr == b''
+    assert marker.read_text() == 'first\n'
+    assert State(tmp_path / 'data').snapshot()['total_runs'] == 1
+
+
+def test_compound_function_resolution_falls_back_as_one_native_chain(tmp_path):
+    event = {
+        'hook_event_name': 'PreToolUse',
+        'tool_name': 'Bash',
+        'session_id': 'session',
+        'tool_use_id': 'tool',
+        'cwd': str(tmp_path),
+        'tool_input': {'command': 'git status && git diff'},
+    }
+    output = hook(event, tmp_path / 'data')
+    rewritten = output['hookSpecificOutput']['updatedInput']['command']
+    (tmp_path / 'sub').mkdir()
+    shell = (
+        'git() { if [ "$1" = status ]; then cd sub; printf ready > relative.txt; '
+        'else cat relative.txt; fi; }; ' + rewritten
+    )
+    proc = subprocess.run(['/bin/sh', '-c', shell], cwd=tmp_path, capture_output=True)
+    assert proc.returncode == 0 and proc.stdout == b'ready' and proc.stderr == b''
+    assert (tmp_path / 'sub' / 'relative.txt').read_text() == 'ready'
+    assert State(tmp_path / 'data').snapshot()['total_runs'] == 0
+
+
+def test_compound_unknown_leaf_remains_entirely_native(tmp_path, monkeypatch):
+    bin_dir = tmp_path / 'bin'
+    bin_dir.mkdir()
+    marker = tmp_path / 'native'
+    _fake_rg(bin_dir, marker)
+    monkeypatch.setenv('PATH', str(bin_dir) + os.pathsep + os.environ['PATH'])
+    monkeypatch.setenv('HELIX_CHAIN_MARKER', str(marker))
+    command = 'rg first && printf second'
+    event = {
+        'hook_event_name': 'PreToolUse',
+        'tool_name': 'Bash',
+        'session_id': 'session',
+        'cwd': str(tmp_path),
+        'tool_input': {'command': command},
+    }
+    assert hook(event, tmp_path / 'data') == {}
+    proc = subprocess.run(['/bin/sh', '-c', command], cwd=tmp_path, capture_output=True)
+    assert proc.returncode == 0 and proc.stdout == b'first\nsecond' and proc.stderr == b''
+    assert marker.read_text() == 'first\n'
+    assert State(tmp_path / 'data').snapshot()['total_runs'] == 0
+
+
 def test_shared_adapter_records_parent_child_without_model_specific_rewrite(tmp_path):
     for model in ['gpt-6-astra', 'gpt-5.6-luna']:
         event = {'hook_event_name': 'PreToolUse', 'tool_name': 'Bash', 'session_id': 'child', 'tool_use_id':'one', 'cwd':str(tmp_path), 'model':model, 'tool_input':{'command':'git status --short'}}
@@ -104,7 +254,8 @@ def test_completed_command_survives_publication_failure_once(tmp_path, monkeypat
 
 
 @pytest.mark.skipif(os.name!='posix',reason='POSIX native process group')
-def test_intercept_preserves_stdin_environment_and_native_group(tmp_path,monkeypatch):
+@pytest.mark.parametrize('leaf_count', [1, 2])
+def test_intercept_preserves_stdin_environment_and_native_group(tmp_path,monkeypatch,leaf_count):
     import base64
     import signal
     import time
@@ -114,12 +265,13 @@ def test_intercept_preserves_stdin_environment_and_native_group(tmp_path,monkeyp
     exe.chmod(0o755)
     monkeypatch.setenv('PATH',str(bin_dir)+os.pathsep+os.environ['PATH'])
     monkeypatch.setenv('HELIX_NATIVE_TEST','exact value')
-    event={'hook_event_name':'PreToolUse','tool_name':'Bash','session_id':'parent','agent_id':'child','cwd':str(tmp_path),'tool_input':{'command':'rg needle'}}
+    event={'hook_event_name':'PreToolUse','tool_name':'Bash','session_id':'parent','agent_id':'child','cwd':str(tmp_path),'tool_input':{'command':' && '.join(['rg needle'] * leaf_count)}}
     command=hook(event,tmp_path/'data')['hookSpecificOutput']['updatedInput']['command']
     p=subprocess.Popen(['/bin/sh','-c',command],cwd=tmp_path,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
     out,err=p.communicate(b'exact stdin\n',timeout=5)
     assert p.returncode==0 and err==b''
-    assert json.loads(out)==[str(tmp_path),'exact value','exact stdin\n',p.pid]
+    values = [json.loads(line) for line in out.splitlines()]
+    assert values == [[str(tmp_path),'exact value','exact stdin\n' if i == 0 else '',p.pid] for i in range(leaf_count)]
     events=State(tmp_path/'data').snapshot()
     with State(tmp_path/'data').db() as db:
         row=db.execute("SELECT body FROM events WHERE kind='CODEX_EXECUTED'").fetchone()
