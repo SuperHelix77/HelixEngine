@@ -32,7 +32,7 @@ def local_path(root,name):
     if not isinstance(name,str) or not name or '\x00' in name or any(x in ('','.','..') for x in name.replace('\\','/').split('/')):
         raise ValueError('Invalid relative dependency path')
     p=Path(name)
-    if p.is_absolute() or not p.parts or any(x in ('.','..') for x in p.parts):
+    if p.drive or p.root or p.is_absolute() or not p.parts or any(x in ('.','..') for x in p.parts):
         raise ValueError('Invalid relative dependency path')
     result=root/p
     for part in [result,*list(result.parents)[:len(p.parts)-1]]:

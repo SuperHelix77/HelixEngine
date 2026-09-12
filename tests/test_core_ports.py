@@ -33,24 +33,45 @@ def test_windows_read_retains_both_timestamp_bindings(tmp_path, monkeypatch):
     source = tmp_path / 'input.bin'
     source.write_bytes(b'exact')
     original_fstat = os.fstat
+    original_stat = Path.stat
     changed = False
+    path_changed = False
     calls = 0
+    path_calls = 0
+
+    def fields_of(value):
+        return {name: getattr(value, name) for name in
+                ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns', 'st_mode')}
+
+    def path_stat(path, **kwargs):
+        nonlocal path_calls
+        value = original_stat(path, **kwargs)
+        if path != source:
+            return value
+        fields = fields_of(value)
+        fields['st_ctime_ns'] = 200 + (path_calls if path_changed else 0)
+        path_calls += 1
+        return SimpleNamespace(**fields)
 
     def descriptor_stat(fd):
         nonlocal calls
         value = original_fstat(fd)
-        fields = {name: getattr(value, name) for name in
-                  ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns', 'st_mode')}
-        fields['st_ctime_ns'] += 100 + (calls if changed else 0)
+        fields = fields_of(value)
+        fields['st_ctime_ns'] = 100 + (calls if changed else 0)
         calls += 1
         return SimpleNamespace(**fields)
 
     monkeypatch.setattr(dep, 'WINDOWS', True)
     monkeypatch.setattr(os, 'fstat', descriptor_stat)
+    monkeypatch.setattr(Path, 'stat', path_stat)
     identity, data = dep.read_file(source, dep.metric())
     assert data == b'exact'
-    assert identity['stamp'][4] == identity['path_stamp'][4] + 100
+    assert identity['stamp'][4] == 100 and identity['path_stamp'][4] == 200
     changed = True
+    with pytest.raises(ValueError, match='changed during read'):
+        dep.read_file(source, dep.metric())
+    changed = False
+    path_changed = True
     with pytest.raises(ValueError, match='changed during read'):
         dep.read_file(source, dep.metric())
 
@@ -164,7 +185,10 @@ def test_completion_ledger_duplicate_delivery_is_idempotent(tmp_path):
 
 def test_dependency_port_rejects_traversal_and_symlink(tmp_path):
     assert dep.local_path(tmp_path, "folder/file.txt") == tmp_path / "folder/file.txt"
-    for name in ("./file.txt", "folder/../file.txt", "folder//file.txt", "file.txt/"):
+    rejected = ["./file.txt", "folder/../file.txt", "folder//file.txt", "file.txt/"]
+    if os.name == 'nt':
+        rejected.extend(['C:outside', '\\outside'])
+    for name in rejected:
         with pytest.raises(ValueError):
             dep.local_path(tmp_path, name)
     (tmp_path / "target").write_text("x")
