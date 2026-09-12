@@ -202,8 +202,8 @@ def execute(encoded):
     # Never transform an interactive tool into a buffered foreground job.
     if any(stream.isatty() for stream in (sys.stdin, sys.stdout, sys.stderr)) or shutil.which(argv[0]) != spec['resolved']:
         os.execvp(argv[0], argv)
-    from helixengine.runtime import Runtime
     try:
+        from helixengine.runtime import Runtime
         runtime = Runtime(spec['data_dir'])
     except Exception:
         # Preparation failed before a command was started. Preserve the native

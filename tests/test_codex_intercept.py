@@ -228,6 +228,34 @@ def test_storage_denial_before_execution_preserves_native_command(tmp_path, monk
     assert calls==[('git',argv)]
 
 
+def test_runtime_import_failure_preserves_native_command_once(tmp_path, monkeypatch):
+    import base64
+    import builtins
+    from helixengine import codex_intercept as intercept
+    monkeypatch.chdir(tmp_path)
+    argv=[sys.executable,'-c','import os; print(os.environ["HELIX_NATIVE_IMPORT_TEST"])']
+    spec={'argv':argv,'cwd':str(tmp_path/'hook-context'),'resolved':intercept.shutil.which(argv[0]),
+          'data_dir':str(tmp_path/'data'),'kind':'generic','binding':{}}
+    encoded=base64.urlsafe_b64encode(json.dumps(spec).encode()).decode()
+    original_import=builtins.__import__
+    def missing_runtime(name,*args,**kwargs):
+        if name == 'helixengine.runtime':
+            raise ModuleNotFoundError("No module named 'certifi'")
+        return original_import(name,*args,**kwargs)
+    class NativeExec(Exception):pass
+    calls=[]
+    def native(file,args):
+        calls.append((file,args))
+        raise NativeExec()
+    monkeypatch.setenv('HELIX_NATIVE_IMPORT_TEST','exact value')
+    monkeypatch.setattr(builtins,'__import__',missing_runtime)
+    monkeypatch.setattr(intercept.os,'execvp',native)
+    with pytest.raises(NativeExec):intercept.execute(encoded)
+    assert calls==[(argv[0],argv)]
+    assert Path.cwd()==tmp_path
+    assert os.environ['HELIX_NATIVE_IMPORT_TEST']=='exact value'
+
+
 def test_comments_native_and_other_input_fields_retained(tmp_path):
     assert route('git status # note') is None
     event={'hook_event_name':'PreToolUse','tool_name':'Bash','session_id':'x','cwd':str(tmp_path),
