@@ -11,6 +11,8 @@ from helixengine.codex_intercept import hook, route
 from helixengine.runtime import Runtime
 from helixengine.state import State
 
+pytestmark = pytest.mark.skipif(os.name != 'posix', reason='Native foreground hook qualifies POSIX only')
+
 
 def test_router_preserves_unknown_and_shell_semantics():
     for command in ['echo hi', 'git status; touch x', 'rg "$HOME" x', 'pytest --pdb', 'pytest -s', 'git diff | head', 'python3 script.py', 'pytest *.py', 'pytest\nwhoami']:

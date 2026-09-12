@@ -39,6 +39,12 @@ def _parser():
     for name in ("on", "off", "status", "doctor"):
         commands.add_parser(name)
 
+    codex = commands.add_parser("codex", help="manage the shared project Codex hooks; native trust review remains required")
+    codex_actions = codex.add_subparsers(dest="codex_action", required=True)
+    for action in ("install", "remove", "status"):
+        target = codex_actions.add_parser(action)
+        target.add_argument("--project", required=True, help="explicit existing project directory")
+
     run = commands.add_parser("run", help="execute one argv exactly once")
     run.add_argument("--kind", choices=("generic", "pytest", "compiler"), default="generic")
     run.add_argument("--cwd", default=None)
@@ -125,6 +131,14 @@ def _exit_code(result):
 
 def main(argv=None):
     args = _parser().parse_args(argv)
+    if args.command == "codex":
+        from .codex_setup import configure
+        try:
+            print(_json(configure(args.project, args.data_dir, action=args.codex_action)))
+            return 0
+        except (OSError, ValueError, TypeError) as exc:
+            print(f"helixengine: {exc}", file=sys.stderr)
+            return 2
     if args.command == "serve":
         if bool(args.observe_rollout) != bool(args.observe_thread):
             raise ValueError("Both --observe-rollout and --observe-thread are required")
