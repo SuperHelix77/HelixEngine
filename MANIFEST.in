@@ -2,6 +2,7 @@ include API_CONTRACT.md
 include README.md
 include pyproject.toml
 recursive-include docs *
+prune docs/research
 recursive-include scripts *
 recursive-include tests *
 recursive-include integrations *.md
