@@ -519,6 +519,37 @@ function updateConnection() {
   }
 }
 
+function renderChat() {
+  const research = state.snapshot?.hub_mode === 'research';
+  $('chat-research').hidden = !research;
+  if (!research) return;
+  document.title = 'Helix Engine · Research HUD';
+  $('hero-title').textContent = 'Research, with receipts.';
+  const chat = state.snapshot.chat_observer;
+  if (!chat) { $('chat-health').textContent = 'No chat attached. Release service remains separate.'; return; }
+  $('chat-health').textContent = `${chat.connected ? 'ATTACHED' : 'ATTENTION'} · ${text(chat.thread_id)} · ${chat.worker_error || chat.error || 'read-only'} · scan ${dateTime(chat.last_scan, 'pending')}`;
+  const usage = chat.usage || {};
+  const facts = [
+    ['Current model / effort', `${text(chat.model)} / ${text(chat.effort)}`],
+    ['Native responses since attachment', formatInteger(chat.response_count)],
+    ['Input tokens', formatInteger(usage.input_tokens)],
+    ['Cached input tokens', formatInteger(usage.cached_input_tokens)],
+    ['Output tokens (includes reasoning)', formatInteger(usage.output_tokens)],
+    ['Reasoning subset', formatInteger(usage.reasoning_output_tokens)],
+    ['Observer bytes read', formatInteger(chat.bytes_read)],
+    ['Receipt coverage since attachment', chat.coverage_complete === true ? 'Complete for supported records' : 'INCOMPLETE — inspect observer error'],
+    ['Savings / capability parity', 'UNMEASURED for this chat']
+  ];
+  $('chat-metrics').replaceChildren(...facts.map(([label, value]) => {
+    const row = element('p'); row.append(element('span', `${label}: `), element('strong', value)); return row;
+  }));
+  $('chat-recent').replaceChildren(...(chat.recent || []).map(record => {
+    const tr = element('tr');
+    for (const value of [record.timestamp, record.model, formatInteger(record.usage?.input_tokens), formatInteger(record.usage?.cached_input_tokens), formatInteger(record.usage?.output_tokens)]) tr.append(element('td', value));
+    return tr;
+  }));
+}
+
 function render() {
   if (!state.snapshot) return;
   updateMeta();
@@ -532,6 +563,7 @@ function render() {
   }
   costView();
   renderRuntime();
+  renderChat();
 }
 
 function accept(next) {

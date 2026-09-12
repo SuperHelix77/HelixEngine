@@ -32,6 +32,9 @@ def _parser():
     serve_command = commands.add_parser("serve", help="serve the loopback release console")
     serve_command.add_argument("--port", type=int, default=8769)
     serve_command.add_argument("--open", action="store_true")
+    serve_command.add_argument("--research", action="store_true", help="use an isolated research hub")
+    serve_command.add_argument("--observe-rollout", help="explicit local Codex rollout; metadata only")
+    serve_command.add_argument("--observe-thread", help="exact thread identity to observe")
 
     for name in ("on", "off", "status", "doctor"):
         commands.add_parser(name)
@@ -122,9 +125,22 @@ def _exit_code(result):
 
 def main(argv=None):
     args = _parser().parse_args(argv)
+    if args.command == "serve":
+        if bool(args.observe_rollout) != bool(args.observe_thread):
+            raise ValueError("Both --observe-rollout and --observe-thread are required")
+        if args.observe_rollout and not args.research:
+            raise ValueError("Chat observation is research-only")
+        if args.research:
+            if args.port == 8769:
+                raise ValueError("Research must use a different port from release (try 8770)")
+            if Path(args.data_dir).expanduser().resolve() == Path("~/.helixengine").expanduser().resolve():
+                raise ValueError("Research requires a separate --data-dir")
     runtime = Runtime(args.data_dir)
     try:
         if args.command == "serve":
+            runtime.research = args.research
+            if args.observe_rollout:
+                runtime.attach_chat(args.observe_rollout, args.observe_thread)
             serve(runtime, args.port, args.open)
             return 0
         if args.command == "status":
@@ -157,10 +173,9 @@ def main(argv=None):
                     )
                 )
             else:
-                # No CLI logging is added to native streams.  The receipt is
-                # retained in status/SQLite and can be retrieved explicitly.
-                _write_exact(sys.stdout, result["stdout"])
-                _write_exact(sys.stderr, result["stderr"])
+                stdout, stderr = runtime.visible_output(result)
+                _write_exact(sys.stdout, stdout)
+                _write_exact(sys.stderr, stderr)
             return _exit_code(result)
         if args.command == "retrieve":
             print(_json(runtime.retrieve(args.receipt, args.stream, args.start, args.end)))

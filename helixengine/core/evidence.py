@@ -324,6 +324,16 @@ def _safe_progress(callback, stdout_path, stderr_path):
         return
 
 
+class CapturePublicationError(RuntimeError):
+    """A command completed but evidence publication failed; never execute again."""
+
+    def __init__(self, cause, stdout, stderr, exit_code, timed_out, interrupted, staging):
+        super().__init__(f"Evidence publication failed: {type(cause).__name__}: {cause}")
+        self.result = dict(stdout=stdout, stderr=stderr, exit_code=exit_code,
+                           timed_out=timed_out, interrupted=interrupted,
+                           recovery_staging=str(staging))
+
+
 def capture(
     store,
     argv,
@@ -335,6 +345,8 @@ def capture(
     on_start=None,
     on_progress=None,
     poll_interval=0.05,
+    completed_result=None,
+    native_process_group=False,
 ):
     """Execute exactly one argv without a shell and retain both raw streams.
 
@@ -381,16 +393,26 @@ def capture(
     process_group_id = None
     cleanup_info = {
         "attempted": False,
-        "forced": True,
-        "method": "windows-taskkill-tree" if os.name == "nt" else "posix-process-group",
+        "forced": not native_process_group,
+        "method": "native-owned-process-group" if native_process_group else "windows-taskkill-tree" if os.name == "nt" else "posix-process-group",
         "status": "not_started",
         "reasons": [],
         "parent_exit_observed": None,
-        "scope": "managed-foreground-process-group",
+        "scope": "native-owned-process-group" if native_process_group else "managed-foreground-process-group",
     }
 
     def request_cleanup(reason):
         if child is None:
+            return
+        if native_process_group:
+            # Remain in Codex's process group: its cancellation must reach the
+            # original command and descendants even if this wrapper is SIGKILLed.
+            # Never kill the caller's whole group from inside the wrapper.
+            if child.poll() is None:
+                child.kill()
+                cleanup_info["attempted"] = True
+            cleanup_info["status"] = "native_group_owner_responsible"
+            cleanup_info["reasons"].append(reason)
             return
         cleanup_info["attempted"] = True
         cleanup_info["reasons"].append(reason)
@@ -409,7 +431,7 @@ def capture(
             if os.name == "nt":
                 popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
             else:
-                popen_kwargs["start_new_session"] = True
+                popen_kwargs["start_new_session"] = not native_process_group
             try:
                 child = subprocess.Popen(argv, **popen_kwargs)
             except OSError as exc:
@@ -479,40 +501,49 @@ def capture(
     _safe_progress(on_progress, stdout_path, stderr_path)
     stdout_bytes = stdout_path.read_bytes()
     stderr_bytes = stderr_path.read_bytes()
+    if completed_result is not None:
+        completed_result.update(stdout=stdout_bytes, stderr=stderr_bytes,
+            exit_code=exit_code, timed_out=timed_out, interrupted=interrupted,
+            recovery_staging=str(staging))
     store.metrics["staging_bytes_read"] += len(stdout_bytes) + len(stderr_bytes)
     store.metrics["staging_bytes_written"] += len(stdout_bytes) + len(stderr_bytes)
-    stdout_ref = store.put(stdout_bytes)
-    stderr_ref = store.put(stderr_bytes)
-    finished = time.time()
-    after = snapshot()
-    receipt = {
-        "schema": "helix.command.v1",
-        "argv": list(argv),
-        "cwd": str(cwd),
-        "environment_id": environment_id,
-        "started_unix": started,
-        "finished_unix": finished,
-        "wall_seconds": round(finished - started, 6),
-        "exit_code": exit_code,
-        "timed_out": timed_out,
-        "interrupted": interrupted,
-        "stdout": stdout_ref,
-        "stderr": stderr_ref,
-        "changed_watched_files": {
-            path: {"before": before[path], "after": after[path]}
-            for path in before
-            if before[path] != after[path]
-        },
-        "descendant_cleanup": cleanup_info,
-        "limits": "stdout/stderr bytes retained separately; cross-stream interleaving is not recorded; watched-file changes only; the managed foreground process group receives forced descendant cleanup after parent observation; detached sessions/background daemons are outside this capture; environment label is caller supplied, not a full environment attestation",
-    }
-    if launch_error is not None:
-        receipt["launch_error"] = launch_error
-    key = store.put(json.dumps(receipt, ensure_ascii=False, separators=(",", ":")).encode())["sha256"]
-    staged = json.dumps({"receipt": key, "staging_copies_retained": True}, separators=(",", ":"))
-    (staging / "receipt.json").write_text(staged, encoding="utf-8")
-    store.metrics["staging_bytes_written"] += len(staged.encode())
-    return key
+    try:
+        stdout_ref = store.put(stdout_bytes)
+        stderr_ref = store.put(stderr_bytes)
+        finished = time.time()
+        after = snapshot()
+        receipt = {
+            "schema": "helix.command.v1",
+            "argv": list(argv),
+            "cwd": str(cwd),
+            "environment_id": environment_id,
+            "started_unix": started,
+            "finished_unix": finished,
+            "wall_seconds": round(finished - started, 6),
+            "exit_code": exit_code,
+            "timed_out": timed_out,
+            "interrupted": interrupted,
+            "stdout": stdout_ref,
+            "stderr": stderr_ref,
+            "changed_watched_files": {
+                path: {"before": before[path], "after": after[path]}
+                for path in before
+                if before[path] != after[path]
+            },
+            "descendant_cleanup": cleanup_info,
+            "limits": ("Native caller owns process-group lifecycle. " if native_process_group else "") + "stdout/stderr bytes retained separately; cross-stream interleaving is not recorded; watched-file changes only; standalone capture forces managed-group descendant cleanup, while native-group capture delegates group lifecycle to the caller; detached sessions/background daemons are outside this capture; environment label is caller supplied, not a full environment attestation",
+        }
+        if launch_error is not None:
+            receipt["launch_error"] = launch_error
+        key = store.put(json.dumps(receipt, ensure_ascii=False, separators=(",", ":")).encode())["sha256"]
+        staged = json.dumps({"receipt": key, "staging_copies_retained": True}, separators=(",", ":"))
+        (staging / "receipt.json").write_text(staged, encoding="utf-8")
+        store.metrics["staging_bytes_written"] += len(staged.encode())
+        return key
+    except Exception as exc:
+        raise CapturePublicationError(exc, stdout_bytes, stderr_bytes, exit_code,
+                                      timed_out, interrupted, staging) from exc
+
 
 
 def run(store, argv, cwd, environment_id, kind="generic", timeout=None, watch=(), env=None):

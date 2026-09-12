@@ -14,7 +14,7 @@ from pathlib import Path
 from . import release_data
 from .core import named_plans
 from .core.completion_ledger import CompletionLedger
-from .core.evidence import Store, capture, packet
+from .core.evidence import CapturePublicationError, Store, capture, packet
 from .core.workflow_memory import Memory
 from .pricing import Prices, estimate
 from .state import State
@@ -57,6 +57,30 @@ class Runtime:
         # explicitly because its lifecycle can join the worker on close.
         self._pricing_enabled = False
         self._closed = False
+        self.research = False
+        self.chat_observer = None
+        self._chat_stop = threading.Event()
+        self._chat_thread = None
+        self._chat_error = None
+
+    def attach_chat(self, rollout, thread_id):
+        """Observe native metadata only; never intercept or initiate inference."""
+        from .chat_observer import ChatObserver
+        if self.chat_observer is not None:
+            raise ValueError("A chat is already attached")
+        self.chat_observer = ChatObserver(self.data_dir, rollout, thread_id)
+
+        def watch():
+            while not self._chat_stop.is_set():
+                try:
+                    self.chat_observer.scan()
+                    self._chat_error = None
+                except Exception as exc:
+                    self._chat_error = type(exc).__name__
+                self._chat_stop.wait(1)
+
+        self._chat_thread = threading.Thread(target=watch, name="helix-chat-observer", daemon=True)
+        self._chat_thread.start()
 
     def _telemetry(self, kind, body, run=None):
         return self.state.event(kind, body, run=run)
@@ -70,6 +94,9 @@ class Runtime:
 
     def close(self):
         """Close the runtime and join any server-owned pricing worker."""
+        self._chat_stop.set()
+        if self._chat_thread is not None:
+            self._chat_thread.join(timeout=5)
         with self._price_lock:
             self._pricing_enabled = False
             self._closed = True
@@ -123,6 +150,7 @@ class Runtime:
         result = {
             "schema": "helix.app.v1",
             "app_version": APP_VERSION,
+            "hub_mode": "research" if self.research else "release",
             "observed_at": observed,
             "settings": state["settings"],
             "csrf_token": self.csrf_token,
@@ -141,6 +169,9 @@ class Runtime:
                 "error": None,
             },
         }
+        if self.chat_observer is not None:
+            result["chat_observer"] = self.chat_observer.snapshot()
+            result["chat_observer"]["worker_error"] = self._chat_error
         return result
 
     def settings(self):
@@ -154,7 +185,7 @@ class Runtime:
         if kind not in ("generic", "pytest", "compiler"):
             raise ValueError("Unknown command kind")
 
-    def run(self, argv, cwd=None, *, kind="generic", timeout=None, environment_id="helix-cli"):
+    def run(self, argv, cwd=None, *, kind="generic", timeout=None, environment_id="helix-cli", native_process_group=False):
         """Run one native command and retain exact raw streams.
 
         The setting is copied into the run before the child starts.  Reduction
@@ -189,6 +220,7 @@ class Runtime:
         def on_progress(stdout_bytes, stderr_bytes):
             self.state.progress(run_id, stdout_bytes, stderr_bytes)
 
+        captured = {}
         try:
             receipt_key = capture(
                 self.store,
@@ -198,7 +230,17 @@ class Runtime:
                 timeout=timeout,
                 on_start=on_start,
                 on_progress=on_progress,
+                completed_result=captured,
+                native_process_group=native_process_group,
             )
+        except CapturePublicationError as exc:
+            try:
+                self.state.fail_without_receipt(run_id, str(exc),
+                    elapsed_seconds=time.perf_counter() - started)
+            except Exception:
+                pass
+            return {**exc.result, "run": row, "receipt": None,
+                    "packet_receipt": None, "publication_error": str(exc)}
         except BaseException as exc:
             # No retry: a launch or observer failure is itself the terminal
             # observation for this requested command.
@@ -209,7 +251,11 @@ class Runtime:
             )
             raise
 
-        receipt = self.store.receipt(receipt_key)
+        try:
+            receipt = self.store.receipt(receipt_key)
+        except Exception as exc:
+            return {**captured, "run": row, "receipt": receipt_key,
+                    "packet_receipt": None, "publication_error": str(exc)}
         stdout_bytes = receipt["stdout"]["bytes"]
         stderr_bytes = receipt["stderr"]["bytes"]
         raw_bytes = stdout_bytes + stderr_bytes
@@ -239,27 +285,35 @@ class Runtime:
             if exit_code == 0 and not receipt["timed_out"] and not receipt.get("interrupted", False)
             else "FAILED"
         )
-        row = self.state.finish(
-            run_id,
-            state=terminal_state,
-            stdout_bytes=stdout_bytes,
-            stderr_bytes=stderr_bytes,
-            visible_bytes=visible_bytes,
-            elapsed_seconds=receipt["wall_seconds"],
-            exit_code=exit_code,
-            receipt=receipt_key,
-            reducer_status=reducer_status,
-            packet_receipt=packet_key,
-            timed_out=receipt["timed_out"],
-            interrupted=receipt.get("interrupted", False),
-            error=reducer_error or receipt.get("launch_error"),
-        )
+        # Keep the completed result available if final telemetry cannot commit.
+        raw_stdout = captured["stdout"]
+        raw_stderr = captured["stderr"]
+        publication_error = None
+        try:
+            row = self.state.finish(
+                run_id,
+                state=terminal_state,
+                stdout_bytes=stdout_bytes,
+                stderr_bytes=stderr_bytes,
+                visible_bytes=visible_bytes,
+                elapsed_seconds=receipt["wall_seconds"],
+                exit_code=exit_code,
+                receipt=receipt_key,
+                reducer_status=reducer_status,
+                packet_receipt=packet_key,
+                timed_out=receipt["timed_out"],
+                interrupted=receipt.get("interrupted", False),
+                error=reducer_error or receipt.get("launch_error"),
+            )
+        except Exception as exc:
+            publication_error = f"Telemetry publication failed: {type(exc).__name__}: {exc}"
         return {
             "run": row,
             "receipt": receipt_key,
             "packet_receipt": packet_key,
-            "stdout": self.store.get(receipt["stdout"]["sha256"]),
-            "stderr": self.store.get(receipt["stderr"]["sha256"]),
+            "stdout": raw_stdout,
+            "stderr": raw_stderr,
+            "publication_error": publication_error,
             "exit_code": exit_code,
             "timed_out": receipt["timed_out"],
             "interrupted": receipt.get("interrupted", False),
@@ -267,6 +321,22 @@ class Runtime:
 
     def retrieve(self, receipt, stream, start=None, end=None):
         return self.store.retrieve(receipt, stream, start, end)
+
+    def visible_output(self, result):
+        """Deliver the selected packet; retain raw streams in the evidence store."""
+        packet_ref = result.get("packet_receipt")
+        if packet_ref:
+            try:
+                return self.store.get(packet_ref), b""
+            except Exception as exc:
+                # The operation already ran. Deliver captured bytes, never retry.
+                result["delivery_error"] = f"{type(exc).__name__}: {exc}"
+                try:
+                    self.state.event("PACKET_DELIVERY_FAILED", {"receipt": packet_ref,
+                        "error": result["delivery_error"]}, run=result["run"]["id"])
+                except Exception:
+                    pass
+        return result["stdout"], result["stderr"]
 
     def usage_import(self, run_id, receipt_json):
         raw = Path(receipt_json).expanduser().read_bytes()
