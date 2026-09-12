@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import sys
 
 import pytest
 
@@ -228,7 +229,7 @@ def test_invalid_configuration_and_publication_failure_preserve_previous_config(
     assert source_context.status(data, project)["paths"] == ["one.txt"]
 
 
-def test_changed_source_is_rebound_to_new_exact_reference(tmp_path):
+def test_changed_source_is_rebound_to_new_exact_reference(tmp_path, monkeypatch):
     project, data, store = _setup(tmp_path)
     source = project / "source.txt"
     first = b"first\r\n"
@@ -237,7 +238,17 @@ def test_changed_source_is_rebound_to_new_exact_reference(tmp_path):
     source_context.configure(data, project, ["source.txt"])
     one = source_context.prepare(data, project, store)
     source.write_bytes(second)
+    stamps = []
+    original_stamp = source_context._path_stamp
+    def traced_stamp(value):
+        stamp = original_stamp(value)
+        caller = sys._getframe(1)
+        stamps.append({'at': caller.f_lineno, 'stamp': stamp,
+                       'birthtime_ns': getattr(value, 'st_birthtime_ns', None)})
+        return stamp
+    monkeypatch.setattr(source_context, '_path_stamp', traced_stamp)
     two = source_context.prepare(data, project, store)
+    assert two['context'] is not None, {'report': two['report'], 'stamps': stamps}
     first_entry = json.loads(one["context"])["files"][0]
     second_entry = json.loads(two["context"])["files"][0]
     assert first_entry["sha256"] != second_entry["sha256"]
