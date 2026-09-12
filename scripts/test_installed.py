@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import sysconfig
 import tempfile
 
 
@@ -70,9 +71,9 @@ def main() -> int:
             raise SystemExit(f"unexpected installed version: {payload.get('version')!r}")
 
         executable_names = ("helixengine.exe", "helixengine") if os.name == "nt" else ("helixengine",)
-        # Venv Python may be a symlink to the base interpreter.  The console
-        # script is beside the venv path, so do not resolve that symlink.
-        bin_dir = Path(sys.executable).parent
+        # Windows global Python puts launchers in Scripts, while a venv
+        # already keeps its interpreter there. Ask the interpreter's scheme.
+        bin_dir = Path(sysconfig.get_path('scripts'))
         console_path = next((bin_dir / name for name in executable_names if (bin_dir / name).is_file()), None)
         if console_path is None:
             raise SystemExit(f"installed console entry point not found beside {sys.executable}")
@@ -80,7 +81,7 @@ def main() -> int:
         if "usage:" not in help_result.stdout.lower():
             raise SystemExit(f"console help did not contain usage:\n{help_result.stdout}")
 
-        _run(
+        test_result = _run(
             [
                 sys.executable,
                 "-m",
@@ -92,6 +93,7 @@ def main() -> int:
             cwd=outside,
             environment=environment,
         )
+        print(test_result.stdout.strip())
 
     print(json.dumps({"installed_module": str(module_file), "console": str(console_path), "outside": True}))
     return 0
