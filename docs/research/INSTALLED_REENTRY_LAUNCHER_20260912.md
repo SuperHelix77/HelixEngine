@@ -43,7 +43,10 @@ check saw RUNNING, then read an unfinished result dictionary after a three-secon
 join. The test now holds the child until observation, releases it explicitly,
 and awaits its result with a bound, propagating worker failures. It still checks
 real live bytes, successful completion and a separate actual timeout. Runtime
-production behavior is unchanged. New Windows CI confirmation is pending.
+production behavior is unchanged. All seven packaging/browser CI jobs passed
+on commit `19776ba7e86151bebe3ffccfe1b6ad16bf2cafe2`, including Windows
+Python 3.11 and 3.13, macOS, Linux, and the browser smoke.
+[CI receipt](https://github.com/SuperHelix77/HelixEngine/actions/runs/34715775029).
 
 ## Evidence
 

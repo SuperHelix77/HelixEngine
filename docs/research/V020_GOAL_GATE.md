@@ -98,3 +98,13 @@ v0.2 release. Its wheel SHA-256 is
 `cddd931f7ef6f3921e888eb0cdc1ce5866466c30a41343a93fb25eaac9a6efaf`.
 Exact smoke/build evidence is retained outside the release package in
 `research/v020-release-qualification-20260912/`.
+
+## Later evidence recheck
+
+The apparent Astra maintenance 78.38/75.93 recovered result also ends with a
+JSON edit-list candidate answer; offline publication-lock reconciliation does
+not qualify its final-answer contract. It remains excluded. The next bounded
+lead is restoring ordinary internal execution and a model-written final to the
+Sol dependency-scheduling mechanism, subject to installed-path offline gates.
+See [the residual recheck](COHORT_RESIDUAL_RECHECK_20260912.md). No cell or median
+is promoted by that design or its conditional headroom calculation.
