@@ -38,7 +38,10 @@ def read_file(path,metrics):
     data=b''
     try:
         before=os.fstat(fd)
-        if stamp(initial)!=stamp(before):raise ValueError('Dependency identity changed before read')
+        if stamp(initial)!=stamp(before):
+            fields=('device','file_id','size','mtime_ns','ctime_ns','mode')
+            changes={key:[a,b] for key,a,b in zip(fields,stamp(initial),stamp(before)) if a!=b}
+            raise ValueError('Dependency identity changed before read: '+str(changes))
         if not stat.S_ISREG(before.st_mode):raise ValueError('Dependency is not a regular file')
         with os.fdopen(fd,'rb',closefd=False) as f:data=f.read()
         after=os.fstat(fd)
