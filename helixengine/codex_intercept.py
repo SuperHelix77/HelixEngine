@@ -45,6 +45,10 @@ def _simple_route(command):
         if any(x in argv for x in ('--pdb', '--trace', '-s', '--capture=no')):
             return None
         kind = 'pytest'
+    elif name in ('python', 'python3') and argv[1:3] == ['-m', 'unittest']:
+        # The generic view preserves unittest counts, failure identities and
+        # exact evidence. Keep argv intact; this only routes the execution.
+        kind = 'generic'
     elif name == 'git':
         if len(argv) < 2 or argv[1] not in ('status', 'diff', 'log', 'show', 'ls-files'):
             return None

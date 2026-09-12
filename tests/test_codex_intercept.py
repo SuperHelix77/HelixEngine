@@ -19,6 +19,48 @@ def test_router_preserves_unknown_and_shell_semantics():
         assert route(command) is None
     assert route('git status --short')['kind'] == 'generic'
     assert route('python3 -m pytest -q')['kind'] == 'pytest'
+    assert route('python3 -m unittest discover -v')['kind'] == 'generic'
+    assert route('python3 -m unittest discover -v')['argv'] == ['python3', '-m', 'unittest', 'discover', '-v']
+    assert route('python3 -i -m unittest') is None
+    assert route('python3 -m unittest | head') is None
+
+
+@pytest.mark.parametrize('fails', [False, True])
+@pytest.mark.parametrize('child', [False, True])
+def test_unittest_native_route_executes_once_and_preserves_result(tmp_path, fails, child):
+    (tmp_path / 'test_probe.py').write_text(
+        'import unittest\nfrom pathlib import Path\n'
+        'with Path("executions").open("a") as stream: stream.write("once\\n")\n'
+        'class Probe(unittest.TestCase):\n'
+        '    def test_contract(self):\n'
+        f'        self.assertEqual({1 if fails else 2}, 2, "preserve diagnostic")\n'
+    )
+    data = tmp_path / 'engine'
+    event = {
+        'hook_event_name': 'PreToolUse', 'tool_name': 'Bash',
+        'session_id': 'parent-unittest', 'turn_id': 'turn-unittest',
+        'tool_use_id': 'tool-unittest', 'cwd': str(tmp_path),
+        'tool_input': {'command': 'python3 -m unittest -v test_probe'},
+    }
+    if child:
+        event['agent_id'] = 'child-unittest'
+    rewritten = hook(event, data)['hookSpecificOutput']['updatedInput']['command']
+    proc = subprocess.run(['/bin/sh', '-c', rewritten], cwd=tmp_path, capture_output=True)
+    assert proc.returncode == int(fails)
+    assert (tmp_path / 'executions').read_text() == 'once\n'
+    output = proc.stdout + proc.stderr
+    assert b'Ran 1 test' in output
+    assert b'test_contract' in output
+    assert (b'FAILED (failures=1)' if fails else b'OK') in output
+    if fails:
+        assert b'preserve diagnostic' in output
+    state = State(data)
+    assert state.snapshot()['total_runs'] == 1
+    with state.db() as db:
+        executed = [json.loads(row['body']) for row in db.execute(
+            "SELECT body FROM events WHERE kind='CODEX_EXECUTED'")]
+    assert len(executed) == 1
+    assert executed[0]['thread_id'] == ('child-unittest' if child else 'parent-unittest')
 
 
 def test_router_compound_is_strict_and_preserves_leaf_spelling():

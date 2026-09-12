@@ -117,8 +117,12 @@ Root and independent review found and fixed path normalization, bounded CLI
 errors, FIFO-open blocking, aggregate read growth, cross-file mutation,
 Windows binary-read flags and oversize configuration publication. The first
 installed suite passed 455 checks but preceded the last two review fixes;
-the final fresh installed wheel passed **456 tests in 15.65 seconds**.
-Windows-specific execution still requires the corresponding CI result.
+the next wheel passed 456 locally but failed Windows Python 3.13 CI.
+After the timestamp correction above, the fresh installed wheel passed
+**458 tests in 15.82 seconds**. All seven jobs in
+[CI for `d401289`](https://github.com/SuperHelix77/HelixEngine/actions/runs/34721171108)
+passed, including Windows, Linux and macOS on Python 3.11/3.13 and browser smoke.
+This qualifies the tested platform behavior, not native Windows hook installation.
 
 Direct invocation of the installed hook command passed root/child exact-content,
 new-source-version, old-object recovery, missing-file fallback, Engine OFF and
@@ -136,6 +140,26 @@ desktop request. Telemetry deliberately says `hook_response_not_wire_verified`.
 Native economics, semantic parity and self-activation remain unqualified.
 No production source opt-in or model-setting change was made for the root agent.
 
+## Ordinary unittest routing gap
+
+The installed transfer probe previously used an explicit `helixengine run`
+command. Inspection of the shared router found that ordinary
+`python -m unittest` and `python3 -m unittest` were not admitted, although
+the existing generic reducer already preserved unittest counts and failure IDs.
+The router now admits these commands without changing their arguments, using
+the same execution, fallback, exact capture and delivery boundary as other
+supported command families. Arbitrary Python scripts and interactive Python
+remain outside this admission rule.
+
+Focused tests executed ordinary rewritten unittest commands once for each of
+parent/child and success/failure cases. They checked exit status, counts,
+diagnostic text and producing-thread identity. This is an adapter integration
+check, not a native model-request or savings result. The separate source-wire
+probe retains its earlier frozen installed wheel so the two changes cannot be
+silently conflated.
+The fresh installed wheel passed 462 tests in 16.09 seconds locally; its SHA-256
+is `6d9eaef44371632e442e1b8435e36a8a5faaaf9e79e86890f88d85f2d54afacd`.
+
 ## Evidence
 
 - Native edit-batch PROBE SHA-256:
@@ -144,8 +168,10 @@ No production source opt-in or model-setting change was made for the root agent.
   `6c080fb574d44a54d911ca69b86d5687634bba7c78a8853ece0b8901d8d3de6e`.
 - File-mention valid-case first request SHA-256:
   `4b49c25a7972deb6fe1b4124730560edce8e9f8565b368441aa7913ddc234a52`.
-- Final installed source-context wheel SHA-256:
+- Source-context wheel before the Windows timestamp correction (not cross-platform qualified):
   `ff2ad6b0c5f684b20439161bcfd01e7de07525d34a63fdad198cd5999ae801c0`.
+- Installed wheel after the timestamp correction:
+  `50b03cf74dd97023a6bebfb1eb3f26fee80ce656af2302612140454aaa9b09a6`.
 - Installed hook smoke RESULT SHA-256:
   `0664437e6d07c7c394b41fd60022be2d5e02ddeca23639ac285fb4df94d57484`.
 
