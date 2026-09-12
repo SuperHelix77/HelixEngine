@@ -30,7 +30,8 @@ def main():
             deadline=time.monotonic()+15
             while True:
                 try:
-                    with urlopen(url+'/api/release-state',timeout=2):
+                    with urlopen(url+'/api/release-state',timeout=2) as response:
+                        initial_state=json.load(response)
                         break
                 except URLError:
                     if server.poll() is not None or time.monotonic()>deadline:
@@ -45,7 +46,7 @@ def main():
                 errors=[]
                 page.on('pageerror',lambda e:errors.append(str(e)))
                 page.goto(url)
-                expect(page.locator('.model-card')).to_have_count(5)
+                expect(page.locator('.model-card')).to_have_count(len(initial_state['release']['lanes']))
                 expect(page.locator('#engine-switch')).to_be_enabled()
                 assert page.locator('#engine-switch').is_checked()
                 page.locator('label[for="engine-switch"]').click()
