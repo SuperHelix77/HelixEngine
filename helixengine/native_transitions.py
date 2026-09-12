@@ -17,6 +17,7 @@ import importlib
 import json
 import re
 import sys
+import sysconfig
 import time
 from pathlib import Path
 
@@ -56,6 +57,10 @@ _SEMANTIC_REQUIRED = "SEMANTIC_REQUIRED"
 _RECORDED_EVENT = "CODEX_TRANSITION_RECORDED"
 _INCOMPLETE_EVENT = "CODEX_TRANSITION_INCOMPLETE"
 _SEMANTIC_EVENT = "CODEX_TRANSITION_SEMANTIC_REQUIRED"
+_REPLAY_BOOTSTRAP = (
+    "import sys;sys.path.insert(0,sys.argv.pop(1));"
+    "from helixengine.cli import main;raise SystemExit(main())"
+)
 
 # Tests and callers may provide the parallel gate as an object.  Keeping the
 # import lazy also lets this controller remain importable while that module is
@@ -934,6 +939,30 @@ def _recorded_response(result):
     return {"continue": False, "stopReason": message, "systemMessage": message}
 
 
+def _reentry_launcher():
+    """Return a trusted launcher for the exact-history CLI operation.
+
+    Isolated ``-m`` resolution is safe only when this package is installed in
+    one of the current interpreter's configured installation roots.  Source,
+    editable, and user-path imports retain the explicit resolved package root
+    so a hostile working directory or ``PYTHONPATH`` cannot select a shadow.
+    """
+    package_root = Path(__file__).resolve().parent
+    try:
+        package_parent = package_root.parent
+        installed_roots = {
+            Path(path).resolve()
+            for scheme in ("purelib", "platlib")
+            for path in (sysconfig.get_path(scheme),)
+            if isinstance(path, str) and path and Path(path).is_absolute()
+        }
+    except (OSError, RuntimeError, TypeError, ValueError):
+        installed_roots = set()
+    if package_parent in installed_roots:
+        return [sys.executable, "-I", "-m", "helixengine"]
+    return [sys.executable, "-I", "-c", _REPLAY_BOOTSTRAP, str(package_parent)]
+
+
 def reentry_context(data_dir, thread_id):
     """Offer exact-history navigation, never historical text as instructions.
 
@@ -977,13 +1006,13 @@ def reentry_context(data_dir, thread_id):
         projects.add(project)
     if len(projects) > 8:
         raise ValueError("Recovery scope exceeds bounded locator")
+    cli_args = [
+        "--data-dir", str(state.directory), "memory", "replay", thread_id,
+        "--limit", "100",
+    ]
+    launcher = _reentry_launcher()
     commands = [
-        [sys.executable, "-I", "-c",
-         "import sys;sys.path.insert(0,sys.argv.pop(1));"
-         "from helixengine.cli import main;raise SystemExit(main())",
-         str(Path(__file__).resolve().parent.parent),
-         "--data-dir", str(state.directory),
-         "memory", "replay", project, thread_id, "--limit", "100"]
+        launcher + [*cli_args[:4], project, *cli_args[4:]]
         for project in sorted(projects)
     ]
     context = (

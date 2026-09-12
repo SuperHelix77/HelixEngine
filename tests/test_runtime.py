@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
@@ -104,32 +105,43 @@ def test_marginal_projection_keeps_raw_and_material_projection_is_delivered(tmp_
 
 def test_live_progress_and_timeout_are_observed(tmp_path):
     runtime = Runtime(tmp_path)
-    holder = {}
+    release = tmp_path / "release-child"
+    # Hold the child in its observable running phase until the test releases it.
+    # A fixed sleep / three-second join races slow Windows receipt publication.
+    code = (
+        "import pathlib,sys,time;print('ready'*400,flush=True);"
+        "release=pathlib.Path(sys.argv[1]);deadline=time.monotonic()+15\n"
+        "while not release.exists() and time.monotonic()<deadline: time.sleep(.02)\n"
+        "assert release.exists(), 'test did not release child'\n"
+        "print('done')"
+    )
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(runtime.run, command(code, release), tmp_path, timeout=20)
+            saw_running = False
+            try:
+                deadline = time.monotonic() + 10
+                while not future.done() and time.monotonic() < deadline:
+                    rows = runtime.state.snapshot()["runs"]
+                    if rows and rows[0]["state"] == "RUNNING" and rows[0]["stdout_bytes"] > 0:
+                        saw_running = True
+                        break
+                    time.sleep(0.02)
+            finally:
+                release.touch()
+            # Propagate worker exceptions; do not inspect an unfinished result dict.
+            result = future.result(timeout=25)
+            assert saw_running
+            assert result["exit_code"] == 0
+            assert result["stdout"].splitlines()[-1] == b"done"
+            assert result["run"]["state"] == "COMPLETED"
 
-    def work():
-        holder["result"] = runtime.run(
-            command("import sys,time;print('ready'*400,flush=True);time.sleep(.35);print('done')"),
-            tmp_path,
-        )
-
-    thread = threading.Thread(target=work)
-    thread.start()
-    saw_running = False
-    deadline = time.monotonic() + 2
-    while thread.is_alive() and time.monotonic() < deadline:
-        rows = runtime.state.snapshot()["runs"]
-        if rows and rows[0]["state"] == "RUNNING" and rows[0]["stdout_bytes"] > 0:
-            saw_running = True
-            break
-        time.sleep(0.02)
-    thread.join(3)
-    assert saw_running
-    assert holder["result"]["run"]["state"] == "COMPLETED"
-
-    timed = runtime.run(command("import time;time.sleep(10)"), tmp_path, timeout=0.1)
-    assert timed["timed_out"] is True
-    assert timed["run"]["state"] == "FAILED"
-    assert timed["run"]["reducer_status"] in {"REDUCED", "BYPASSED_SMALL_OUTPUT"}
+        timed = runtime.run(command("import time;time.sleep(10)"), tmp_path, timeout=0.1)
+        assert timed["timed_out"] is True
+        assert timed["run"]["state"] == "FAILED"
+        assert timed["run"]["reducer_status"] in {"REDUCED", "BYPASSED_SMALL_OUTPUT"}
+    finally:
+        runtime.close()
 
 
 def test_memory_and_usage_imports_are_real_and_telemetred(tmp_path):

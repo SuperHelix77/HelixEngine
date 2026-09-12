@@ -1,5 +1,7 @@
 import hashlib
 import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -24,6 +26,7 @@ REPLAY_BOOTSTRAP = (
     "import sys;sys.path.insert(0,sys.argv.pop(1));"
     "from helixengine.cli import main;raise SystemExit(main())"
 )
+REPLAY_CLI_ARG_COUNT = 8
 
 
 def _row(kind, **payload):
@@ -162,6 +165,10 @@ def _commands(response):
     return json.loads(context[len(prefix) : -len(suffix)])
 
 
+def _cli_args(command):
+    return command[-REPLAY_CLI_ARG_COUNT:]
+
+
 def _gap_response():
     return {
         "hookSpecificOutput": {
@@ -190,10 +197,7 @@ def test_recorded_suppression_returns_exact_memory_replay_locator_without_payloa
     response = transitions.reentry_context(data_dir, "root")
     commands = _commands(response)
     command = commands[0]
-    assert command[:3] == [sys.executable, "-I", "-c"]
-    assert command[3] == REPLAY_BOOTSTRAP
-    assert command[4] == str(Path(transitions.__file__).resolve().parent.parent)
-    assert command[5:] == [
+    assert _cli_args(command) == [
         "--data-dir",
         str(data_dir.resolve()),
         "memory",
@@ -203,7 +207,10 @@ def test_recorded_suppression_returns_exact_memory_replay_locator_without_payloa
         "--limit",
         "100",
     ]
-    assert "-m" not in command
+    launcher = command[:-REPLAY_CLI_ARG_COUNT]
+    assert launcher == transitions._reentry_launcher()
+    if launcher[2:4] == ["-c", REPLAY_BOOTSTRAP]:
+        assert launcher[4] == str(Path(transitions.__file__).resolve().parent.parent)
     context = response["hookSpecificOutput"]["additionalContext"]
     assert prompt not in context
     assert capture["record_hash"] not in context
@@ -224,6 +231,98 @@ def test_recorded_suppression_returns_exact_memory_replay_locator_without_payloa
     assert fallback == response
 
 
+def test_reentry_launcher_uses_module_for_current_interpreter_install(
+    tmp_path, monkeypatch
+):
+    purelib = tmp_path / "site-packages"
+    package = purelib / "helixengine"
+    package.mkdir(parents=True)
+    module_file = package / "native_transitions.py"
+    module_file.touch()
+    monkeypatch.setattr(transitions, "__file__", str(module_file))
+    monkeypatch.setattr(
+        transitions.sysconfig,
+        "get_path",
+        lambda scheme: str(purelib) if scheme in {"purelib", "platlib"} else None,
+    )
+
+    assert transitions._reentry_launcher() == [
+        sys.executable,
+        "-I",
+        "-m",
+        "helixengine",
+    ]
+
+
+@pytest.mark.parametrize("import_root_name", ["checkout", "user-site"])
+def test_reentry_launcher_keeps_bootstrap_for_source_or_user_path(
+    tmp_path, monkeypatch, import_root_name
+):
+    import_root = tmp_path / import_root_name
+    package = import_root / "helixengine"
+    package.mkdir(parents=True)
+    module_file = package / "native_transitions.py"
+    module_file.touch()
+    monkeypatch.setattr(transitions, "__file__", str(module_file))
+    monkeypatch.setattr(
+        transitions.sysconfig,
+        "get_path",
+        lambda scheme: str(tmp_path / f"configured-{scheme}"),
+    )
+
+    launcher = transitions._reentry_launcher()
+    assert launcher == [
+        sys.executable,
+        "-I",
+        "-c",
+        REPLAY_BOOTSTRAP,
+        str(import_root),
+    ]
+
+
+def test_reentry_locator_survives_hostile_cwd_and_pythonpath(tmp_path, monkeypatch):
+    configured_site_roots = {
+        Path(path).resolve()
+        for scheme in ("purelib", "platlib")
+        for path in (transitions.sysconfig.get_path(scheme),)
+        if isinstance(path, str) and path
+    }
+    if not any((root / "certifi").is_dir() for root in configured_site_roots):
+        pytest.skip("isolated subprocess lacks the declared certifi dependency")
+    data_dir, project, _transcript, _memory, _capture, _event = _record_suppressed(
+        tmp_path, monkeypatch, "recorded prompt"
+    )
+    hostile = tmp_path / "hostile"
+    hostile.mkdir()
+    shadow = hostile / "helixengine"
+    shadow.mkdir()
+    (shadow / "__init__.py").write_text(
+        'raise RuntimeError("shadow package executed")\n', encoding="utf-8"
+    )
+    (hostile / "helixengine.py").write_text(
+        'raise RuntimeError("shadow module executed")\n', encoding="utf-8"
+    )
+
+    command = _commands(transitions.reentry_context(data_dir, "root"))[0]
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = str(hostile)
+    environment["PYTHONNOUSERSITE"] = "1"
+    result = subprocess.run(
+        command,
+        cwd=hostile,
+        env=environment,
+        text=True,
+        capture_output=True,
+        timeout=20,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    replay = json.loads(result.stdout)
+    assert replay["history"]
+    assert json.loads(replay["history"][0]["text"])["prompt"] == "recorded prompt"
+
+
 def test_off_restores_locator_for_prior_suppressed_history(tmp_path, monkeypatch):
     data_dir, project, transcript, _memory, _capture, _event = _record_suppressed(
         tmp_path, monkeypatch, "recorded prompt"
@@ -237,7 +336,7 @@ def test_off_restores_locator_for_prior_suppressed_history(tmp_path, monkeypatch
         data_dir,
     )
     assert response["hookSpecificOutput"]["hookEventName"] == "UserPromptSubmit"
-    assert _commands(response)[0][9:11] == [str(project.resolve()), "root"]
+    assert _cli_args(_commands(response)[0])[4:6] == [str(project.resolve()), "root"]
 
 
 def test_off_without_previous_outbox_returns_empty(tmp_path):
@@ -264,10 +363,10 @@ def test_reentry_context_isolated_by_thread(tmp_path):
 
     root_commands = _commands(transitions.reentry_context(data_dir, "root"))
     child_commands = _commands(transitions.reentry_context(data_dir, "child"))
-    assert {command[9:11][0] for command in root_commands} == {str(root_project.resolve())}
-    assert {command[9:11][1] for command in root_commands} == {"root"}
-    assert {command[9:11][0] for command in child_commands} == {str(child_project.resolve())}
-    assert {command[9:11][1] for command in child_commands} == {"child"}
+    assert {_cli_args(command)[4] for command in root_commands} == {str(root_project.resolve())}
+    assert {_cli_args(command)[5] for command in root_commands} == {"root"}
+    assert {_cli_args(command)[4] for command in child_commands} == {str(child_project.resolve())}
+    assert {_cli_args(command)[5] for command in child_commands} == {"child"}
     assert transitions.reentry_context(data_dir, "unrelated-child") == {}
 
 
@@ -281,7 +380,9 @@ def test_reentry_context_allows_eight_projects_and_rejects_ninth(tmp_path):
         _insert_outbox(data_dir, thread_id="root", project=project, event_id=f"event-{index}")
 
     commands = _commands(transitions.reentry_context(data_dir, "root"))
-    assert {command[9] for command in commands} == {str(project.resolve()) for project in projects}
+    assert {_cli_args(command)[4] for command in commands} == {
+        str(project.resolve()) for project in projects
+    }
 
     ninth = tmp_path / "project-8"
     ninth.mkdir()
