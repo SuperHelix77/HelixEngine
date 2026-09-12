@@ -680,6 +680,52 @@ def materialize_recording(memory, grant_hash, expected_head):
     return {**result, "grant_hash": grant_hash, "transition_head": expected_head}
 
 
+def read_recording(memory, grant_hash, expected_head, *, thread_id):
+    """Read a verified historical artifact snapshot; never authorize new work.
+
+    The caller must fence its external completion head for this operation.
+    Terminal semantic invalidation ends recording, not access to preceding
+    authentic history. Current dependencies and artifact bytes must still match.
+    """
+    from .recording_artifact import MAX_ARTIFACT_BYTES, read_verified
+
+    before_io = dict(memory.store.metrics)
+    grant = _read_grant(memory, grant_hash)
+    if grant["thread_id"] != thread_id:
+        raise ValueError("Recording read thread mismatch")
+    target = grant.get("materialization")
+    if target is None:
+        raise ValueError("No bound materialization")
+    _, rows, _, _, _ = _recover_history(memory, grant, grant_hash, expected_head)
+    recorded = [row for row in rows if row["body"]["action"] == "record"]
+    if not recorded:
+        raise ValueError("No committed recording history")
+    initial = memory.store.get(target["initial_sha256"])
+    pieces = [row["capture"]["prompt"].encode("utf-8") + b"\n" for row in recorded]
+    if len(initial) + sum(map(len, pieces)) > MAX_ARTIFACT_BYTES:
+        raise ValueError("Recording snapshot exceeds byte bound")
+    expected = initial + b"".join(pieces)
+    payload, receipt = read_verified(target["path"], expected)
+    # Dependency changes during the read invalidate reuse; no repair or retry.
+    for dependency in grant["dependencies"]:
+        if _dependency_digest(dependency["path"]) != dependency["sha256"]:
+            raise ValueError("Recording dependency changed during read")
+    return payload, {
+        **receipt,
+        "grant_hash": grant_hash,
+        "transition_head": expected_head,
+        "thread_id": thread_id,
+        "project": grant["project"],
+        "epoch": grant["epoch"],
+        "recorded_events": len(recorded),
+        "semantic_approval": False,
+        "scope": "Verified historical snapshot; not future file freshness or current approval",
+        "store_io": {key: memory.store.metrics[key] - value for key, value in before_io.items()},
+        "dependency_check_count": 2 * len(grant["dependencies"]),
+        "io_scope": "Evidence-store counters and artifact reads; physical and SQLite I/O unmetered",
+    }
+
+
 def _result(state, head, *, replayed=False, reason, receipt=None, notification=None, include_receipt=False, include_notification=False):
     result = {"state": state, "head": head, "replayed": bool(replayed), "reason": reason}
     if include_receipt:

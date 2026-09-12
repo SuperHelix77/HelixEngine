@@ -931,6 +931,32 @@ def status(data_dir, thread_id):
         return _public(_row(db, thread_id))
 
 
+def read_recording(data_dir, memory, thread_id):
+    """Read a bound snapshot while fencing the controller's completion state.
+
+    Recovery remains available after ordinary semantic re-entry or OFF. Pending
+    publication/conflicts fail closed. This does not activate a grant or change
+    the native transcript; callers must deliver returned bytes as tool evidence.
+    """
+    thread_id = _identity(thread_id, "thread_id")
+    state = State(data_dir)
+    _ensure_schema(state)
+
+    def operation(db):
+        row = _row(db, thread_id)
+        if row is None:
+            raise ValueError("No recording binding for thread")
+        if bool(row["in_flight"]) or (
+            bool(row["blocked"]) and row["last_failure"] != "semantic_required"
+        ):
+            raise ValueError("Recording publication requires recovery")
+        return _transition_gate().read_recording(
+            memory, row["grant_hash"], row["expected_head"], thread_id=thread_id
+        )
+
+    return _locked(state, operation)
+
+
 def _recorded_response(result):
     reference = result["receipt"] or result["head"]
     short = reference[:16]

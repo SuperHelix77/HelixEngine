@@ -793,8 +793,28 @@ def publish(path, expected_before: bytes, expected_after: bytes) -> dict:
         _close_binding(binding)
 
 
-def verify(path, expected: bytes) -> dict:
-    """Read and verify one existing bound file without modifying it."""
+def _verification_receipt(
+    binding: _ParentBinding, payload: bytes, target_stat, budget: _ReadBudget
+) -> dict:
+    return {
+        "schema": _SCHEMA,
+        "operation": "verify",
+        "status": "verified",
+        "path": binding.display_path,
+        "bytes": len(payload),
+        "sha256": _digest(payload),
+        "readback": True,
+        "readback_exact": True,
+        "read_bytes": budget.used,
+        "permissions": stat.S_IMODE(target_stat.st_mode),
+        "lock": "parent_directory_exclusive",
+        "max_bytes": MAX_ARTIFACT_BYTES,
+        "read_budget_bytes": MAX_READ_BYTES,
+    }
+
+
+def _read_and_verify(path, expected: bytes) -> tuple[bytes, dict]:
+    """Read once under the verification lock and return the compared bytes."""
 
     expected = _require_expected(expected, "expected")
     path_value = _path_value(path)
@@ -810,23 +830,34 @@ def verify(path, expected: bytes) -> dict:
             if payload != expected:
                 raise RecordingConflict("recording target does not match expected bytes")
             _verify_parent(binding)
-            return {
-                "schema": _SCHEMA,
-                "operation": "verify",
-                "status": "verified",
-                "path": binding.display_path,
-                "bytes": len(payload),
-                "sha256": _digest(payload),
-                "readback": True,
-                "readback_exact": True,
-                "read_bytes": budget.used,
-                "permissions": stat.S_IMODE(target_stat.st_mode),
-                "lock": "parent_directory_exclusive",
-                "max_bytes": MAX_ARTIFACT_BYTES,
-                "read_budget_bytes": MAX_READ_BYTES,
-            }
+            return payload, _verification_receipt(
+                binding, payload, target_stat, budget
+            )
     finally:
         _close_binding(binding)
+
+
+def verify(path, expected: bytes) -> dict:
+    """Read and verify one existing bound file without modifying it."""
+
+    _, receipt = _read_and_verify(path, expected)
+    return receipt
+
+
+def read_verified(path, expected: bytes) -> tuple[bytes, dict]:
+    """Return the exact bytes verified at one point in time.
+
+    The returned bytes are the immutable payload compared while the exclusive
+    parent-directory lock was held.  The receipt describes that point-in-time
+    exact read; it makes no future-freshness or semantic guarantee.
+    """
+
+    payload, receipt = _read_and_verify(path, expected)
+    read_receipt = dict(receipt)
+    read_receipt["scope"] = (
+        "Point-in-time exact read; not future file freshness or semantic guarantee"
+    )
+    return payload, read_receipt
 
 
 __all__ = [
@@ -842,4 +873,5 @@ __all__ = [
     "UncertainPublication",
     "publish",
     "verify",
+    "read_verified",
 ]
