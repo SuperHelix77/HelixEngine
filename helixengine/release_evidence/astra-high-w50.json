@@ -1,0 +1,57 @@
+{
+  "id": "astra-high-w50",
+  "model": "gpt-6-astra",
+  "effort": "high",
+  "task": "W50 /49 resolved acknowledgements",
+  "policy": "Bound caller transitions + one semantic turn",
+  "state": "BOUNDED_DEVELOPMENT_CANDIDATE",
+  "gate": "Finite W50 state, recovery and final-answer review PASS",
+  "model_wide_parity": false,
+  "release_median": null,
+  "paired_tasks": 1,
+  "fixed_cohort_cells": 7,
+  "final_contract": "Complete model-written final after relevant execution evidence; ordinary tools and effort retained.",
+  "report_url": "https://github.com/SuperHelix77/HelixContext/blob/41cab63/docs/research/w50-native-final-v2/AUDIT.json",
+  "report_sha256": "ca6152872a68ac2df4a0a82a728dda69a39718a395338c7e0154d264121d56bd",
+  "review_url": "https://github.com/SuperHelix77/HelixContext/blob/41cab63/docs/research/w50-native-final-v2/SEMANTIC_REVIEW.json",
+  "review_sha256": "719b420f282b17ed52f166d7a7c119814dfc03a90b142bb14b0061c12c9e5926",
+  "arms": [
+    {
+      "arm": "on",
+      "usage": {
+        "input_tokens": 20099,
+        "output_tokens": 266,
+        "cached_input_tokens": 7040,
+        "reasoning_output_tokens": 70,
+        "cache_write_input_tokens": 0
+      },
+      "native_sha256": "d0cba4a21c9acd317849175fd14a89eba3e7ba369e97e62a672b10940b29cf73",
+      "segments": 1,
+      "seconds": 11.858287665992975,
+      "final_sha256": "8bcd480ed8637503e5d0a1f0d7ff16b842ea7901c31bfa3f98d21a0b57228cd2",
+      "final_url": "https://github.com/SuperHelix77/HelixContext/blob/41cab63/docs/research/w50-native-final-v2/artifacts/on-final.txt"
+    },
+    {
+      "arm": "off",
+      "usage": {
+        "input_tokens": 1193197,
+        "output_tokens": 528,
+        "cached_input_tokens": 1145344,
+        "reasoning_output_tokens": 34,
+        "cache_write_input_tokens": 0
+      },
+      "native_sha256": "2dfe904e5bf40ab517a91ee23d54d6e48b92a3319450b000767bb9faedf5ba84",
+      "segments": 50,
+      "seconds": 175.22670999995898,
+      "final_sha256": "0202c2a7c1ee11dadd4cbbad036c20dce8c66a18a7766ab590c95058f5735380",
+      "final_url": "https://github.com/SuperHelix77/HelixContext/blob/41cab63/docs/research/w50-native-final-v2/artifacts/off-final.txt"
+    }
+  ],
+  "limits": [
+    "One exposed50-event pair; no unseen latent-relevance holdout.",
+    "Exact49ACKs, restarted evidence and full model-written final pass in both arms.",
+    "External display consumer ACK and normal desktop interception remain unproven.",
+    "Mixed semantic W50 policy has a separate observed failure and is excluded from this lane."
+  ],
+  "cost_scope": "Standard API-equivalent scenarios only. Engine, storage, recovery and coordination unpriced; total effective cost and included quota unknown."
+}

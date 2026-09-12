@@ -1,0 +1,57 @@
+{
+  "id": "astra-high-cold",
+  "model": "gpt-6-astra",
+  "effort": "high",
+  "task": "Exact cold recovery",
+  "policy": "Caller-prepared exact evidence",
+  "state": "BOUNDED_DEVELOPMENT_CANDIDATE",
+  "gate": "Finite exact-recovery checks and final-answer review PASS",
+  "model_wide_parity": false,
+  "release_median": null,
+  "paired_tasks": 1,
+  "fixed_cohort_cells": 7,
+  "final_contract": "Complete model-written final after relevant execution evidence; ordinary tools and effort retained.",
+  "report_url": "https://github.com/SuperHelix77/HelixContext/blob/41cab63/docs/research/cold-native-final-v1/AUDIT.json",
+  "report_sha256": "04e477e8705b12c82ff56bc727a240d84e99f0e3c41dd36f5b29031f94443f70",
+  "review_url": "https://github.com/SuperHelix77/HelixContext/blob/41cab63/docs/research/cold-native-final-v1/SEMANTIC_REVIEW.json",
+  "review_sha256": "68fc87b463d384b2809ffdf6d9c0edebb4a1347b9467bc34b53dc24091330b0f",
+  "arms": [
+    {
+      "arm": "off",
+      "usage": {
+        "input_tokens": 92012,
+        "output_tokens": 468,
+        "cached_input_tokens": 72064,
+        "reasoning_output_tokens": 0,
+        "cache_write_input_tokens": 0
+      },
+      "native_sha256": "386127fb48cdcbf90b693ce6986356750d425462927aab51c8527a8151cf4799",
+      "segments": 4,
+      "seconds": 28.48225724999793,
+      "final_sha256": "e926e2c56e178521cf984e241844c2f556c769d246c7b23ecfde8d8df87e3244",
+      "final_url": "https://github.com/SuperHelix77/HelixContext/blob/41cab63/docs/research/cold-native-final-v1/artifacts/off-final.txt"
+    },
+    {
+      "arm": "on",
+      "usage": {
+        "input_tokens": 19979,
+        "output_tokens": 179,
+        "cached_input_tokens": 7808,
+        "reasoning_output_tokens": 60,
+        "cache_write_input_tokens": 0
+      },
+      "native_sha256": "633c57b7adc9efe1c4f11bd7fd4f4207c95f08f9cdb4deec9f3540d75df3ae19",
+      "segments": 1,
+      "seconds": 9.206208458985202,
+      "final_sha256": "07f70b72d231296c7a1ab3475a965bcffa14f91e4e798f7e7e9f8f030273f0df",
+      "final_url": "https://github.com/SuperHelix77/HelixContext/blob/41cab63/docs/research/cold-native-final-v1/artifacts/on-final.txt"
+    }
+  ],
+  "limits": [
+    "One exposed40-event snapshot, not40 live model turns or general semantic reasoning.",
+    "Exact Unicode, whitespace, leading zeros, bytes and evidence identity pass in both arms.",
+    "Measured binding scans total1.55GB logical reads during the pair; physical I/O and full overhead remain unknown.",
+    "Best current balanced input/output Astra lane under the complete-final contract; not model-wide qualification."
+  ],
+  "cost_scope": "Standard API-equivalent scenarios only. Engine, storage, recovery and coordination unpriced; total effective cost and included quota unknown."
+}

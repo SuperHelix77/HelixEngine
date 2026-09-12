@@ -1,0 +1,59 @@
+{
+  "id": "luna-high-maintenance",
+  "model": "gpt-5.6-luna",
+  "effort": "high",
+  "task": "Coding / memory-search maintenance",
+  "policy": "Rejected savings policy \u00b7 Engine remains available",
+  "state": "REJECTED_ECONOMICS_AND_FINAL_CONTRACT",
+  "gate": "Finite code checks PASS \u00b7 candidate final contract FAIL",
+  "model_wide_parity": false,
+  "release_median": null,
+  "paired_tasks": 1,
+  "fixed_cohort_cells": 7,
+  "final_contract": "Complete model-written final after relevant execution evidence; ordinary tools and effort retained.",
+  "report_url": "https://github.com/SuperHelix77/HelixContext/blob/df2a222/docs/research/luna-normal-final-v1-20260910/LUNA_HIGH_RESULT.json",
+  "report_sha256": "34a0ce4a7a28dc2765ada50f211e5e5c19960304583c1cfe5aee8b21bf66e611",
+  "review_url": "https://github.com/SuperHelix77/HelixContext/blob/df2a222/docs/research/luna-normal-final-v1-20260910/FINAL_REVIEW.json",
+  "review_sha256": "3982e6d4d2fba9f62b492d54e7030f51a55fb794d8b696878b663c2987a04a5e",
+  "arms": [
+    {
+      "arm": "on",
+      "usage": {
+        "input_tokens": 161167,
+        "output_tokens": 3574,
+        "cached_input_tokens": 128768,
+        "reasoning_output_tokens": 2033,
+        "cache_write_input_tokens": 0
+      },
+      "native_sha256": "9c28d3b1f63994232ca47ecf4bb2d8a340f682db9d3337ec2d97f295ea8864f1",
+      "segments": 6,
+      "seconds": 86.65609466697788,
+      "final_sha256": "8a32f6d2e32188d6c75f374d46b83cc755bd4fe8e5253c5643ded4da587aeb99",
+      "final_url": "https://github.com/SuperHelix77/HelixContext/blob/df2a222/docs/research/luna-normal-final-v1-20260910/artifacts/candidate-final.md"
+    },
+    {
+      "arm": "off",
+      "usage": {
+        "input_tokens": 157828,
+        "output_tokens": 1878,
+        "cached_input_tokens": 126208,
+        "reasoning_output_tokens": 766,
+        "cache_write_input_tokens": 0
+      },
+      "native_sha256": "ca6f4daa1baba7aee27d578daa07455e06b6024f7a6664d5bff1f15d3fcb1f12",
+      "segments": 7,
+      "seconds": 51.88346758298576,
+      "final_sha256": "9265ecbc28e319d0ee6b2ed3c715f8cd02ebe73b49f79011ee1a35f48fcaf6a6",
+      "final_url": "https://github.com/SuperHelix77/HelixContext/blob/df2a222/docs/research/luna-normal-final-v1-20260910/artifacts/control-final.md"
+    }
+  ],
+  "limits": [
+    "Both artifacts pass23 public tests,94 independent cases and all3 previous model-authored probe programs.",
+    "Candidate final is model-written, but its file:// link violates the configured final-answer contract. It is preserved unchanged.",
+    "Both arms had one failed command; failures and recovery are charged. Higher cost is retained, not rerun away.",
+    "Only maintenance tested in this lane; six other fixed cells and full parity remain unqualified.",
+    "Historical W50/source-only savings remain separate evidence, not a replacement for this negative result."
+  ],
+  "cost_scope": "Standard API-equivalent scenarios only. Engine, storage, recovery and coordination unpriced; total effective cost and included quota unknown.",
+  "comparison_gate": "FAIL"
+}

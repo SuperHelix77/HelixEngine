@@ -1,0 +1,57 @@
+{
+  "id": "sol-high-maintenance",
+  "model": "gpt-5.6-sol",
+  "effort": "high",
+  "task": "Coding / memory-search maintenance",
+  "policy": "Exact edit + checked Engine publication",
+  "state": "BOUNDED_DEVELOPMENT_CANDIDATE",
+  "gate": "Finite coding checks and final-answer review PASS",
+  "model_wide_parity": false,
+  "release_median": null,
+  "paired_tasks": 1,
+  "fixed_cohort_cells": 7,
+  "final_contract": "Complete model-written final after relevant execution evidence; ordinary tools and effort retained.",
+  "report_url": "https://github.com/SuperHelix77/HelixContext/blob/41cab63/docs/research/native-output-v1/SOL_HIGH_RESULT.json",
+  "report_sha256": "91507178b3f9384ddbaebc32a28cc31400957de8483dbc61bd519c4c7e84f8bc",
+  "review_url": "https://github.com/SuperHelix77/HelixContext/blob/41cab63/docs/research/native-output-v1/FINAL_ANSWER_REVIEW.json",
+  "review_sha256": "2e004aee1a8357c2f985d8fd93f421b799b8ef62fad4fba5cd6c24ea66f06003",
+  "arms": [
+    {
+      "arm": "off",
+      "usage": {
+        "input_tokens": 190261,
+        "output_tokens": 3663,
+        "cached_input_tokens": 157056,
+        "reasoning_output_tokens": 1675,
+        "cache_write_input_tokens": 0
+      },
+      "native_sha256": "df7cca0a594f4b9d2297acc8bb11e4e728d819c7ab93df352e566805d3f901d9",
+      "segments": 8,
+      "seconds": 142.81544774997747,
+      "final_sha256": "f4197c35bc3b8e1f1a40b6ea8b73c3101b7f26c161c03a69f931a1419f8caa10",
+      "final_url": "https://github.com/SuperHelix77/HelixContext/blob/41cab63/docs/research/native-output-v1/artifacts/sol-high/off/final-answer.md"
+    },
+    {
+      "arm": "on",
+      "usage": {
+        "input_tokens": 101255,
+        "output_tokens": 1858,
+        "cached_input_tokens": 74112,
+        "reasoning_output_tokens": 764,
+        "cache_write_input_tokens": 0
+      },
+      "native_sha256": "88ade111e443a681c731d7b55e06a05e393fba66736aabe25a18ed90e0e0df55",
+      "segments": 4,
+      "seconds": 74.87456824997207,
+      "final_sha256": "39425eb886a475157724f291fffc2206faeaf84070f95f7d5ba852d7f936e521",
+      "final_url": "https://github.com/SuperHelix77/HelixContext/blob/41cab63/docs/research/native-output-v1/artifacts/sol-high/on/final-answer.md"
+    }
+  ],
+  "limits": [
+    "One exposed development pair; not a holdout or seven-cell model median.",
+    "Both arms pass23 public tests,94 independent cases and all3 model-authored probe programs.",
+    "Sol control includes recovered skill/tool detours; Astra candidate output increases slightly.",
+    "Desktop pre-inference interception and complete long-horizon parity remain unqualified."
+  ],
+  "cost_scope": "Standard API-equivalent scenarios only. Engine, storage, recovery and coordination unpriced; total effective cost and included quota unknown."
+}

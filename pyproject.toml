@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "helixengine"
+version = "0.1.0"
+description = "Local, evidence-preserving command routing and observation runtime."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["certifi>=2024.2.2"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+]
+
+[project.scripts]
+helixengine = "helixengine.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["helixengine*"]
+
+[tool.setuptools.package-data]
+helixengine = [
+    "web/*.html",
+    "web/*.js",
+    "web/*.css",
+    "release_evidence/*.json",
+]

@@ -1,0 +1,25 @@
+{
+  "version": "0.1.0-preview.1",
+  "lanes": [
+    {
+      "file": "sol-high-maintenance.json",
+      "sha256": "0fd5d08e59642b27f99d82c142faf58a4752071becae8d7ad1900ada9fb2b9b4"
+    },
+    {
+      "file": "astra-xhigh-maintenance.json",
+      "sha256": "546818501186aa03079a975a34056ac002557e8a38f10b1de6722e851338a314"
+    },
+    {
+      "file": "astra-high-cold.json",
+      "sha256": "01fe2c4017c61567152ff09ffa036cf11eda1bbe64a41354424bf4a2e3401526"
+    },
+    {
+      "file": "astra-high-w50.json",
+      "sha256": "57012e9e5f2c2ab2d395152b49ef43347ff480a12b4f17cb22f459eb1436c175"
+    },
+    {
+      "file": "luna-high-maintenance.json",
+      "sha256": "07a8f3eab614affa9acd83601d7a3ae6eaf8a8dcf8ff96b57662d1fae9c7a217"
+    }
+  ]
+}
