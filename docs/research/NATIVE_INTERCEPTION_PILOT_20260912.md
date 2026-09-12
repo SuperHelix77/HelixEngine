@@ -74,10 +74,23 @@ tool identity plus a leaf ordinal. The same rule applies to parents and children
 independent of model.
 
 `codex-foreground-v2` implements this in the existing adapter. The full application
-suite passes **205 tests**, including exactly-once order, nonzero short circuit,
+suite passes **207 tests**, including exactly-once order, nonzero short circuit,
 whole-chain function fallback with a working-directory mutation, unknown-leaf
 fallback, quoted syntax rejection, and one/two-leaf stdin/environment/process
 group preservation. Oversized chains remain native.
+
+Live desktop verification subsequently caught a pre-existing working-directory
+binding defect: `PreToolUse.cwd` can be the thread root while a tool's requested
+working directory is a subdirectory. The first live attempt stopped before Git
+execution with `Native cwd changed`. Fresh execution now binds the actual native
+process directory and records the hook directory separately. It never changes
+directory back to the thread root. This is not cached-plan reuse or a waiver of
+stale evidence checks. Single and chained subdirectory cases are covered by tests.
+
+After the correction, this actual desktop Astra parent executed a two-command
+chain through Engine in the requested subdirectory. Both receipts share the
+original tool ID, have distinct leaf ordinals, and record thread-root versus
+execution-directory provenance. `LIVE_PARENT_V2.json` retains those receipts.
 
 The actual installed CLI also passed a zero-hosted-call compound wire check:
 one native tool call, two ordered Engine executions, 32,400 exact raw bytes and

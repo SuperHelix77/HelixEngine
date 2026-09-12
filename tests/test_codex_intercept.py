@@ -255,7 +255,8 @@ def test_completed_command_survives_publication_failure_once(tmp_path, monkeypat
 
 @pytest.mark.skipif(os.name!='posix',reason='POSIX native process group')
 @pytest.mark.parametrize('leaf_count', [1, 2])
-def test_intercept_preserves_stdin_environment_and_native_group(tmp_path,monkeypatch,leaf_count):
+@pytest.mark.parametrize('different_workdir', [False, True])
+def test_intercept_preserves_stdin_environment_and_native_group(tmp_path,monkeypatch,leaf_count,different_workdir):
     import base64
     import signal
     import time
@@ -267,15 +268,19 @@ def test_intercept_preserves_stdin_environment_and_native_group(tmp_path,monkeyp
     monkeypatch.setenv('HELIX_NATIVE_TEST','exact value')
     event={'hook_event_name':'PreToolUse','tool_name':'Bash','session_id':'parent','agent_id':'child','cwd':str(tmp_path),'tool_input':{'command':' && '.join(['rg needle'] * leaf_count)}}
     command=hook(event,tmp_path/'data')['hookSpecificOutput']['updatedInput']['command']
-    p=subprocess.Popen(['/bin/sh','-c',command],cwd=tmp_path,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
+    execution_cwd = tmp_path / 'sub' if different_workdir else tmp_path
+    execution_cwd.mkdir(exist_ok=True)
+    p=subprocess.Popen(['/bin/sh','-c',command],cwd=execution_cwd,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
     out,err=p.communicate(b'exact stdin\n',timeout=5)
     assert p.returncode==0 and err==b''
     values = [json.loads(line) for line in out.splitlines()]
-    assert values == [[str(tmp_path),'exact value','exact stdin\n' if i == 0 else '',p.pid] for i in range(leaf_count)]
+    assert values == [[str(execution_cwd),'exact value','exact stdin\n' if i == 0 else '',p.pid] for i in range(leaf_count)]
     events=State(tmp_path/'data').snapshot()
     with State(tmp_path/'data').db() as db:
         row=db.execute("SELECT body FROM events WHERE kind='CODEX_EXECUTED'").fetchone()
     assert json.loads(row['body'])['thread_id']=='child'
+    assert json.loads(row['body'])['execution_cwd'] == str(execution_cwd)
+    assert json.loads(row['body'])['hook_cwd'] == str(tmp_path)
 
 
 def test_session_scope_includes_children_excludes_other_sessions(tmp_path):

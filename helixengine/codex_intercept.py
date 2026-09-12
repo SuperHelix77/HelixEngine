@@ -194,8 +194,11 @@ def execute(encoded):
     leaf_ordinal = spec.get('leaf_ordinal', 0)
     if type(leaf_ordinal) is not int or not 0 <= leaf_ordinal < MAX_COMPOUND_LEAVES:
         raise ValueError('Invalid leaf ordinal')
-    if Path.cwd().resolve() != Path(spec['cwd']).resolve():
-        raise ValueError('Native cwd changed')
+    # A hook's cwd is the thread root in the desktop dispatcher, while an
+    # individual tool can explicitly request a different workdir. This is fresh
+    # execution, not cached-plan reuse: bind the actual native tool process cwd,
+    # retaining the hook context separately. Never chdir to the thread root.
+    native_cwd = str(Path.cwd().resolve())
     # Never transform an interactive tool into a buffered foreground job.
     if any(stream.isatty() for stream in (sys.stdin, sys.stdout, sys.stderr)) or shutil.which(argv[0]) != spec['resolved']:
         os.execvp(argv[0], argv)
@@ -211,12 +214,12 @@ def execute(encoded):
         raise KeyboardInterrupt
     signal.signal(signal.SIGTERM, interrupted)
     try:
-        binding = spec['binding']
+        binding = {**spec['binding'], 'hook_cwd': spec['cwd'], 'execution_cwd': native_cwd}
         binding_ordinal = binding.get('leaf_ordinal', leaf_ordinal)
         if type(binding_ordinal) is not int or binding_ordinal != leaf_ordinal or not 0 <= binding_ordinal < MAX_COMPOUND_LEAVES:
             raise ValueError('Invalid binding leaf ordinal')
         identity = 'codex:' + binding.get('thread_id', binding.get('agent_id', binding['session_id'])) + ':' + binding.get('tool_use_id', 'UNKNOWN') + ':leaf:' + str(leaf_ordinal)
-        result = runtime.run(argv, spec['cwd'], kind=spec['kind'], environment_id=identity, native_process_group=True)
+        result = runtime.run(argv, native_cwd, kind=spec['kind'], environment_id=identity, native_process_group=True)
         if result.get('publication_error'):
             sys.stderr.write('Helix: evidence/telemetry publication incomplete; raw result retained; no retry.\n')
         try:
