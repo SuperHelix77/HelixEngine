@@ -32,6 +32,10 @@
     {
       "file": "astra-high-bound-recording.json",
       "sha256": "42379dab8f889ff2b5834a9da899061419b4ebafaaaa31eee5fdfbe2b3e7d5f1"
+    },
+    {
+      "file": "sol-high-installed-dependencies.json",
+      "sha256": "c83efbcfe5bc353db2999225b39dd0da86f64e3803f6a3771f8152b7abc3e1f5"
     }
   ]
 }

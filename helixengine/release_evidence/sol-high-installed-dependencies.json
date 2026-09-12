@@ -1,0 +1,59 @@
+{
+  "id": "sol-high-installed-dependencies",
+  "model": "gpt-5.6-sol",
+  "effort": "high",
+  "task": "Coding / installed dependency scheduling",
+  "policy": "Shared native source preparation; compound commands native passthrough",
+  "state": "NO_PARITY_OR_ECONOMIC_QUALIFICATION",
+  "gate": "Finite artifact checks and normal finals PASS; workflow parity unestablished; 65/65 FAIL",
+  "model_wide_parity": false,
+  "release_median": null,
+  "paired_tasks": 1,
+  "fixed_cohort_cells": 7,
+  "final_contract": "Normal model-written prose after execution; unchanged High effort and ordinary tools.",
+  "report_url": "https://github.com/SuperHelix77/HelixEngine/blob/codex/research-hub-observer/docs/research/SOL_SOURCE_NATIVE_PAIR_20260913.md",
+  "report_sha256": "05e525c4574e03424109528effa5d536700de34a214acf4b6f3a89240d7eeb50",
+  "arms": [
+    {
+      "arm": "off",
+      "usage": {
+        "input_tokens": 136092,
+        "cached_input_tokens": 119552,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 2504,
+        "reasoning_output_tokens": 634
+      },
+      "native_sha256": "53e85702845bc8c3dc58e20f9009bfc87cb4ed2770d3e231e9a52baf12216af0",
+      "segments": 7,
+      "seconds": 76.2753572080037,
+      "final_sha256": "9b8d877e4de1e12bd21b7a0b64b016f6915ed95244e6f871aeac1e0286ed4883",
+      "engine_runs": 0,
+      "provider_retry_count": null
+    },
+    {
+      "arm": "on",
+      "usage": {
+        "input_tokens": 91240,
+        "cached_input_tokens": 75008,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1953,
+        "reasoning_output_tokens": 679
+      },
+      "native_sha256": "4745c4a5654aa97e2f2df19702f9f707eca8e2ba6ed7aeceabddc0d9a49ec318",
+      "segments": 5,
+      "seconds": 62.38629620800202,
+      "final_sha256": "7d49e2aad8c67e33cebfd36d9462fdcf8b11c47f28936c2da6560c200aa8b447",
+      "engine_runs": 0,
+      "provider_retry_count": null
+    }
+  ],
+  "limits": [
+    "One control-first development pair; no holdout, causal attribution or model median.",
+    "Both artifacts passed735 graph cases,16 invalid cases and751 nonmutation checks; this is not full workflow parity.",
+    "Control ran500 additional random graph ordering comparisons; candidate used fewer probes.",
+    "Candidate received source but reread it; all commands bypassed Engine execution.",
+    "Uncached input saved only1.86%; output65% target impossible with the observed edit and final segments fixed.",
+    "Parent Git context was visible to both arms; setup, worker, recovery and research costs are additional."
+  ],
+  "cost_scope": "Native task counters only; total effective cost and included-plan quota unknown."
+}

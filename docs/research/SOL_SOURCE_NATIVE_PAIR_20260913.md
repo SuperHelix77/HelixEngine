@@ -87,6 +87,29 @@ probe will be deleted to improve the ratio.
 
 ## Next decision: offline first
 
+### Segment floor, holding observed semantic work fixed
+
+The five candidate segments report these native output totals: 160 (initial
+discovery), 911 (edit-producing segment), 459 (test/probe invocation), 323
+(compilation, protected-file hashes and source reread), and 100 (final answer).
+These are segment counters, not allocations of private reasoning to individual
+subtasks. Reported reasoning is already included.
+
+**CONDITIONAL:** The 65% output-saving budget against this control is 876.4
+tokens. The observed edit-producing segment alone exceeds it. Retaining that
+segment and the normal final leaves 1,011 output tokens: at most **59.62%**
+savings even if every other segment disappeared without replacement cost.
+Those two segments contain 36,994 input tokens, for a corresponding conditional
+72.82% input ceiling. These are frozen-trajectory bounds, not irreducible model
+limits or predictions about another implementation.
+
+The candidate's three shell outputs total 2,539 UTF-8 bytes (368, 417 and 1,754).
+Their native input-token contribution is not separately identified. The largest
+is the requested source reread, which must remain exact when requested. A broader
+command router might improve capture coverage but cannot, by itself, reach the
+output gate on this trajectory. Do not spend another hosted pair merely to
+confirm that arithmetic or suppress the model's probes to fit the budget.
+
 **INFERRED:** Two measured residuals deserve analysis before another native call:
 source rereading despite delivery, and compound commands bypassing execution.
 The pair does not justify a new memory system, kernel or broad model sweep.
