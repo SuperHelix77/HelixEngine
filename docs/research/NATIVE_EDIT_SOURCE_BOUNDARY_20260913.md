@@ -209,8 +209,33 @@ silently conflated.
 The fresh installed wheel passed 462 tests in 16.09 seconds locally; its SHA-256
 is `6d9eaef44371632e442e1b8435e36a8a5faaaf9e79e86890f88d85f2d54afacd`.
 All seven [CI jobs for `ce9c711`](https://github.com/SuperHelix77/HelixEngine/actions/runs/34721825673)
-passed. Native unittest interception/delivery must still be checked before
-crediting this route in a real model comparison.
+passed.
+
+### Native unittest wire gate
+
+The subsequent installed-client probe issued ordinary
+`python3 -m unittest discover -p test_solution.py` commands through native
+`functions.exec`. Both the scripted valid repair and defective repair passed
+the transport checks: one native command, one Engine hook execution, correct
+exit status (0/1), exact archived output, and the real diagnostics delivered
+to the next model request. Source evidence also reached the first request.
+Engine remained ON; the 103-byte success output stayed raw, as did the
+2,855-byte failure output when the compact representation had marginal gain.
+No generated command explicitly invoked Engine. Finals were scripted ordinary
+messages, so this remains a transport falsifier, not model parity.
+
+An initial failed attempt recorded zero Engine runs because a reused harness
+rewrote config.toml and erased native hook trust. Its files and trace remain
+under `unittest-native-hook-20260913/failed-v1`. The correction preserves the
+existing config and checks all four enabled/trusted hooks before starting a
+model turn. Approval was performed through the native CLI UI, without manually
+writing trust hashes or enabling a trust bypass. The failed attempt is not
+counted as a successful Engine optimization.
+
+The corrected run made four loopback provider requests; the failed attempt made
+two more. Neither used hosted inference. Parent research costs are separate.
+Exact artifacts: `research/unittest-native-hook-20260913/RESULT.json`, the two
+case receipt/stream files, first and second serialized requests, and hook preflight.
 
 ## Evidence
 
