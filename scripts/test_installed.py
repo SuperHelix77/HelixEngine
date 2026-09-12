@@ -28,6 +28,7 @@ def _run(command: list[str], *, cwd: Path, environment: dict[str, str]) -> subpr
         env=environment,
         text=True,
         capture_output=True,
+        timeout=240,
     )
     if result.returncode != 0:
         raise SystemExit(

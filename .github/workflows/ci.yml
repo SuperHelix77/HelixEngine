@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   package:
+    timeout-minutes: 15
     name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -73,6 +74,7 @@ jobs:
         run: python scripts/test_installed.py
 
   browser:
+    timeout-minutes: 10
     name: Ubuntu browser smoke
     runs-on: ubuntu-latest
     steps:

@@ -119,13 +119,16 @@ def _build(name: str, version: str) -> None:
                 raise SystemExit(f"release target is not a regular file: {target}")
             target.unlink()
 
-    source_epoch = os.environ.get("SOURCE_DATE_EPOCH", "0")
+    source_epoch = os.environ.get("SOURCE_DATE_EPOCH", "315532800")
     try:
         source_epoch_int = int(source_epoch)
     except ValueError as exc:
         raise SystemExit("SOURCE_DATE_EPOCH must be an integer") from exc
     if source_epoch_int < 0:
         raise SystemExit("SOURCE_DATE_EPOCH must be non-negative")
+    # pip's Windows console launchers are ZIP files too. Build isolation
+    # inherits this value, so dates before 1980 break dependency installation.
+    source_epoch_int = max(source_epoch_int, 315532800)
 
     environment = os.environ.copy()
     environment["SOURCE_DATE_EPOCH"] = str(source_epoch_int)

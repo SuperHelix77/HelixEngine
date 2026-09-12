@@ -37,7 +37,8 @@ The Git blob SHA-1 and raw source SHA-256 commitments are:
 All 11 requested source files are present under `tests/legacy/`. The only
 changes are package qualification of imports to `helixengine.core`, package
 qualification of the two dynamically imported helper modules, a relative
-import for the shared plan fixture, and replacement
+import for the shared plan fixture, child CLI imports bound to the same loaded
+package as their parent (including installed-artifact tests), and replacement
 of the original sibling-file launches with `python -m
 helixengine.core.evidence` and `python -m helixengine.core.plan_cli`. Test
 assertions and regression bodies were preserved; the per-file assertion and

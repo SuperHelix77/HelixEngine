@@ -1,7 +1,9 @@
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
+import helixengine
 
 from .test_named_plans import setup
 
@@ -10,7 +12,9 @@ CLI='helixengine.core.plan_cli'
 
 
 def call(store,*args):
-    result=subprocess.run([sys.executable,'-m',CLI,'--store',str(store.root),*args],cwd=Path(__file__).resolve().parents[2],capture_output=True,text=True)
+    environment = os.environ.copy()
+    environment['PYTHONPATH'] = str(Path(helixengine.__file__).resolve().parent.parent)
+    result=subprocess.run([sys.executable,'-m',CLI,'--store',str(store.root),*args],cwd=store.root,env=environment,capture_output=True,text=True)
     return result,json.loads(result.stdout)
 
 
