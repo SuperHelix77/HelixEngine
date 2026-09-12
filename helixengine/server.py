@@ -7,6 +7,7 @@ import threading
 import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from socketserver import TCPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 from urllib.request import urlopen
@@ -37,6 +38,12 @@ class HelixHTTPServer(ThreadingHTTPServer):
     def __init__(self, address, handler, runtime):
         self.runtime = runtime
         super().__init__(address, handler)
+
+    def server_bind(self):
+        # HTTPServer resolves its hostname synchronously. This server only
+        # binds a literal loopback address; startup must not depend on DNS.
+        TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
 
     def server_close(self):
         try:

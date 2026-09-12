@@ -54,8 +54,8 @@ same dedicated environment and then install the exact wheel URL:
 
 For Windows PowerShell:
 
-    py -3.11 --version
-    py -3.11 -m venv "$env:USERPROFILE\.helixengine-venv"
+    py -3 --version
+    py -3 -m venv "$env:USERPROFILE\.helixengine-venv"
     & "$env:USERPROFILE\.helixengine-venv\Scripts\python.exe" -m pip install --upgrade "https://github.com/SuperHelix77/HelixEngine/releases/download/v0.1.0/helixengine-0.1.0-py3-none-any.whl"
     & "$env:USERPROFILE\.helixengine-venv\Scripts\python.exe" -m helixengine --help
 

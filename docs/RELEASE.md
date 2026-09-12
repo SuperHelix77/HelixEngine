@@ -9,13 +9,13 @@ research ledger or private raw logs into a release.
 Install the build frontend in the maintainer environment, then run:
 
     python3 -m pip install --upgrade build setuptools wheel pytest
-    SOURCE_DATE_EPOCH=0 python3 scripts/build_release.py
+    SOURCE_DATE_EPOCH=315532800 python3 scripts/build_release.py
 
 On Windows PowerShell:
 
-    py -3.11 -m pip install --upgrade build setuptools wheel pytest
-    $env:SOURCE_DATE_EPOCH = "0"
-    py -3.11 scripts/build_release.py
+    py -3 -m pip install --upgrade build setuptools wheel pytest
+    $env:SOURCE_DATE_EPOCH = "315532800"
+    py -3 scripts/build_release.py
 
 The script emits a wheel, an sdist, dist/manifest.json, and
 dist/SHA256SUMS. The manifest records package version, artifact sizes, and
@@ -41,7 +41,7 @@ The wheelhouse must contain certifi for an offline install unless certifi is
 already installed in the selected environment. The runtime package has no
 other dependency.
 
-Browser smoke coverage is CI-only. The Ubuntu browser job installs
+Browser smoke uses a separate development dependency. The Ubuntu browser job installs
 Playwright and Chromium separately; Playwright is not a runtime dependency.
 
 The supported runtime boundary is explicit foreground routing. The `run`

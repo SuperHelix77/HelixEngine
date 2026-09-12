@@ -1,11 +1,25 @@
 import json
 import threading
 import http.client
+import socket
 
 import pytest
 
 from helixengine.runtime import Runtime
 from helixengine.server import make_server
+
+
+def test_loopback_startup_does_not_resolve_hostname(tmp_path, monkeypatch):
+    def no_dns(*args, **kwargs):
+        raise AssertionError('Loopback startup must not consult DNS')
+    monkeypatch.setattr(socket, 'getfqdn', no_dns)
+    runtime = Runtime(tmp_path, price_fetcher=lambda: b'')
+    httpd = make_server(runtime, 0)
+    try:
+        assert httpd.server_name == '127.0.0.1'
+        assert httpd.server_port > 0
+    finally:
+        httpd.server_close()
 
 
 @pytest.fixture
