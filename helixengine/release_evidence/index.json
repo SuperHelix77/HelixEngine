@@ -20,6 +20,10 @@
     {
       "file": "luna-high-maintenance.json",
       "sha256": "07a8f3eab614affa9acd83601d7a3ae6eaf8a8dcf8ff96b57662d1fae9c7a217"
+    },
+    {
+      "file": "astra-high-installed-maintenance.json",
+      "sha256": "52ec6658b1d7942b9324100001c152ed66f3abe0e08f421c370fe8f37f71fe62"
     }
   ]
 }

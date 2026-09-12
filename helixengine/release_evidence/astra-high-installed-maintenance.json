@@ -1,0 +1,57 @@
+{
+  "id": "astra-high-installed-maintenance",
+  "model": "gpt-6-astra",
+  "effort": "high",
+  "task": "Coding / installed memory-search maintenance",
+  "policy": "Installed codex-foreground-v2; all observed commands native passthrough",
+  "state": "NO_ECONOMIC_QUALIFICATION",
+  "gate": "94 independent cases and normal model-written finals PASS; savings FAIL",
+  "model_wide_parity": false,
+  "release_median": null,
+  "paired_tasks": 1,
+  "fixed_cohort_cells": 7,
+  "final_contract": "Normal model-written prose after execution; same High effort and ordinary tools.",
+  "report_url": "https://github.com/SuperHelix77/HelixEngine/blob/codex/research-hub-observer/docs/research/ASTRA_INSTALLED_MAINTENANCE_20260912.md",
+  "report_sha256": "462cfafb0ee47e7ca5ef63096c222fe24563d59989b9cd434acd2d8d68be910f",
+  "arms": [
+    {
+      "arm": "off",
+      "usage": {
+        "input_tokens": 106458,
+        "cached_input_tokens": 92032,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1453,
+        "reasoning_output_tokens": 50
+      },
+      "native_sha256": "44c2b9ce6b709a6143fbbac0a6dbad9e42e2cf15148b717803e2e2e55a7944ac",
+      "segments": 5,
+      "seconds": 61.598390667000785,
+      "final_sha256": "cdf9fb61f24f767c5574c9fc1575f6be92d9160eb5cbfa405f41a74ee19ed5f7",
+      "final_url": "https://github.com/SuperHelix77/HelixEngine/blob/codex/research-hub-observer/docs/research/ASTRA_INSTALLED_MAINTENANCE_20260912.md#control-final-answer",
+      "engine_runs": 0
+    },
+    {
+      "arm": "on",
+      "usage": {
+        "input_tokens": 106628,
+        "cached_input_tokens": 80256,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1782,
+        "reasoning_output_tokens": 56
+      },
+      "native_sha256": "d3276c054d23b790f0c0384674e40ed7650265b025fdb948ec8bb3c97d584b0d",
+      "segments": 5,
+      "seconds": 67.03850016699653,
+      "final_sha256": "9705290170077b45650abd68f184186cd1409756396a539c5c5c005917ddbec9",
+      "final_url": "https://github.com/SuperHelix77/HelixEngine/blob/codex/research-hub-observer/docs/research/ASTRA_INSTALLED_MAINTENANCE_20260912.md#engine-enabled-final-answer",
+      "engine_runs": 0
+    }
+  ],
+  "limits": [
+    "One known development pair; not a seven-cell median or universal parity.",
+    "Zero Engine executions in both arms; token differences cannot establish Engine savings.",
+    "Control includes passive hook overhead. Randomized frozen order: control then enabled.",
+    "Research preparation, workers, recovery and local costs excluded from task counters and not claimed free."
+  ],
+  "cost_scope": "Native task token counters; total effective cost and included-plan quota unknown."
+}
