@@ -19,3 +19,9 @@ The computer-use tool denied access to the Codex app for safety reasons. No alte
 ## Cost discipline
 
 No model benchmark was launched to diagnose hook loading. One bounded Luna High research agent investigated the supported reload surface and completed. All native command probes so far used a local deterministic mock provider. Root/agent research usage is separate from the zero-hosted-inference claim for those mock probes.
+
+## User-performed refresh result
+
+The user clicked Reload hooks. The next admitted `rg --count` completed normally, but the research telemetry store still had zero CODEX_ROUTE/CODEX_EXECUTED records. The refresh button therefore did not establish current-task activation. The task's original session metadata names an earlier working directory, while current settings name Helix; this is consistent with an old configuration snapshot, but does not prove the exact cache owner. Do not spend inference on benchmark optimization while delivery remains absent.
+
+The next clean lifecycle check is a user-performed full Codex quit/reopen and return to this task. No application restart, thread fork, trust bypass or private RPC was performed by the agent. All relevant work is committed on the research branch; the installed release hub remains unchanged. After reopening, check one native command plus exact Engine-origin receipt before drawing a conclusion. If absent again, treat the adapter's current desktop integration as unqualified rather than declaring activation.
