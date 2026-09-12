@@ -21,3 +21,10 @@ On Windows PowerShell:
 ```
 
 The run appears in the local HUD. Native token counters require explicit usage receipt imports; routing a command does not reveal Codex's hidden context or billing formula. This release does not install pre-inference hooks, change Codex's base instructions, lower reasoning effort, rewrite final answers, or claim general model parity. A future caller integration can use the same Engine interfaces without changing this boundary.
+
+The paragraph above describes published v0.1. Development builds provide an
+optional shared native hook, including capture-only `UserPromptSubmit` handling.
+It preserves exact incoming prompts in local Memory while allowing the native
+turn to proceed. See [capture behavior and validation](../../docs/PROMPT_MEMORY.md).
+Installing its configuration is not proof that Codex has trusted or activated it,
+and capture alone does not establish inference savings.

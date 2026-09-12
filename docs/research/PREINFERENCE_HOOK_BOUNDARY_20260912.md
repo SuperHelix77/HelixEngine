@@ -49,3 +49,34 @@ The research worker's written report double-counted reasoning as additional to o
 - Codex binary SHA256: `87a08119b8effa519f0ecb552dc98043f58a8200bf2ec5da60f76890c33e9c3a`
 
 Raw mock requests, CLI events and hook inputs remain in the private research directory. They are not shipped as release history.
+
+
+## App-server transport and shared capture follow-up
+
+**OBSERVED:** a separate auth-free native app-server stop probe delivered the
+stop marker in live `hook/completed` warning/stop entries, with zero endpoint
+requests. It did not persist that marker in `thread/read`. This narrows the
+CLI-only uncertainty: live transport is available, but durable client delivery
+and desktop rendering are still not verified. The reviewed local fixture was
+trusted using `hooks/list` identities and the native configuration API in an
+isolated Codex home; production trust settings remained untouched.
+
+**OBSERVED:** the shared capture-only adapter then archived one actual native
+submission while allowing exactly one mock endpoint request. The original
+60-byte Unicode/whitespace prompt was present in the serialized request and
+recovered byte-exactly from existing Memory by a fresh process. Capture supplies
+no context and no block response. The archive stores the prompt once within its
+structured source object; no redundant base64 copy is needed for exact UTF-8
+recovery. These checks spent no hosted inference.
+
+**CONDITIONAL:** capture is a prerequisite for a safe transition gate, not its
+implementation. Explicit semantic authority, bound state, completion outbox,
+duplicate/crash handling and confirmed delivery remain necessary before any
+installed suppression policy can be qualified. No savings or capability claim
+is promoted by this follow-up.
+
+Follow-up evidence hashes:
+- `appserver_delivery.py`: `8f6892c615355d1d7444d89a2e8fe9f1e5f351e0f302cacb49c4647732d7fb57`
+- `appserver-delivery/RESULT.json`: `c5a7e4d1d4d2d0273fe5297d00cace56d03aae3a3d1326390b76434626a5d7b6`
+- `appserver_capture.py`: `5d5394d0f75c6c9a9d4b2eeb8e1f420aa1445073abafd9a2ae8c4fcd3da04580`
+- `appserver-capture/RESULT.json`: `0bc40791e3e9cdd2312847f2041b0925b32956e9367e556076bfc47da85f3eb0`

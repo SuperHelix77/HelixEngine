@@ -19,7 +19,7 @@ from typing import Any
 
 MAX_CONFIG_BYTES = 256 * 1024
 MANAGED_STATUS = "HelixEngine managed Codex hook (do not edit)"
-EVENTS = ("PreToolUse", "SubagentStart", "SubagentStop")
+EVENTS = ("PreToolUse", "SubagentStart", "SubagentStop", "UserPromptSubmit")
 _LOCK_NAME = ".hooks.json.helix.lock"
 
 
@@ -146,6 +146,7 @@ def _managed_groups(command: str) -> dict[str, dict[str, Any]]:
         "PreToolUse": {"matcher": "^Bash$", "hooks": [hook]},
         "SubagentStart": {"hooks": [hook]},
         "SubagentStop": {"hooks": [hook]},
+        "UserPromptSubmit": {"hooks": [hook]},
     }
 
 

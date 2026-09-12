@@ -38,7 +38,7 @@ def test_install_preserves_top_level_and_unrelated_hooks_and_is_idempotent(tmp_p
     assert result["hooks"]["SessionStart"] == original["hooks"]["SessionStart"]
     assert result["hooks"]["PreToolUse"][0] == original["hooks"]["PreToolUse"][0]
     assert len(result["hooks"]["PreToolUse"]) == 2
-    assert all(event in result["hooks"] for event in ("PreToolUse", "SubagentStart", "SubagentStop"))
+    assert all(event in result["hooks"] for event in ("PreToolUse", "SubagentStart", "SubagentStop", "UserPromptSubmit"))
     assert configure(project, tmp_path / "data")["changed"] is False
     assert hooks.read_bytes() == first_bytes
     backups = list(codex.glob("hooks.json.helix-*.bak"))
@@ -58,6 +58,20 @@ def test_remove_refuses_altered_managed_group(tmp_path):
         configure(project, tmp_path / "data", "remove")
 
     assert hooks.read_bytes() == before
+
+
+def test_upgrade_three_event_install_preserves_existing_groups(tmp_path):
+    configure(tmp_path, tmp_path / "data")
+    hooks = _config(tmp_path)
+    old = json.loads(hooks.read_text())
+    del old["hooks"]["UserPromptSubmit"]
+    hooks.write_text(json.dumps(old), encoding="utf-8")
+    assert configure(tmp_path, tmp_path / "data")["changed"] is True
+    upgraded = json.loads(hooks.read_text())
+    assert len(upgraded["hooks"]["UserPromptSubmit"]) == 1
+    for event, groups in old["hooks"].items():
+        assert upgraded["hooks"][event] == groups
+    assert configure(tmp_path, tmp_path / "data")["changed"] is False
 
 
 def test_remove_own_groups_preserves_unrelated_and_is_idempotent(tmp_path):
@@ -133,14 +147,14 @@ def test_symlinked_codex_and_hooks_are_refused(tmp_path):
         configure(project2, tmp_path / "data")
 
 
-def test_exact_command_has_expected_script_and_all_three_events(tmp_path):
+def test_exact_command_has_expected_script_and_all_four_events(tmp_path):
     project = tmp_path / "project"
     project.mkdir()
     data = tmp_path / "data with spaces"
     configure(project, data, python_executable=sys.executable)
     value = json.loads(_config(project).read_text())
     commands = {}
-    for event in ("PreToolUse", "SubagentStart", "SubagentStop"):
+    for event in ("PreToolUse", "SubagentStart", "SubagentStop", "UserPromptSubmit"):
         group = value["hooks"][event][0]
         commands[event] = group["hooks"][0]["command"]
         assert group["hooks"][0]["statusMessage"] == MANAGED_STATUS
@@ -148,7 +162,7 @@ def test_exact_command_has_expected_script_and_all_three_events(tmp_path):
         assert " hook " in f" {commands[event]} "
         assert "session_scope" not in commands[event]
     assert value["hooks"]["PreToolUse"][0]["matcher"] == "^Bash$"
-    assert commands["PreToolUse"] == commands["SubagentStart"] == commands["SubagentStop"]
+    assert len(set(commands.values())) == 1
 
 
 @pytest.mark.parametrize("raw", [b'{"hooks":{},"hooks":{}}', b'{"hooks":null}', b'{"value":NaN}'])

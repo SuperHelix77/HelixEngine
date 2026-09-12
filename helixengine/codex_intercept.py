@@ -1,4 +1,5 @@
 """One opt-in Codex hook adapter. No inference, approvals, or semantic gating.
+Incoming prompts can be archived exactly; capture never suppresses inference.
 
 Unknown shell syntax uses native execution. Admitted foreground commands use
 Engine capture; TTYs and changed command resolution use native execution.
@@ -119,6 +120,34 @@ def hook(event, data_dir, session_scope=None):
     binding = {key: event[key] for key in ('session_id', 'turn_id', 'tool_use_id', 'model', 'agent_id') if _identity(event.get(key))}
     # Native child hooks retain the parent session_id; agent_id is the child.
     binding['thread_id'] = binding.get('agent_id', binding['session_id'])
+    if kind == 'UserPromptSubmit':
+        if not state.settings()['enabled']:
+            return {}
+        # The caller's native cwd supplies logical memory scope. This is not an
+        # access-control boundary or a claim that historical text is authority.
+        try:
+            cwd = event.get('cwd')
+            if not isinstance(cwd, str) or not Path(cwd).is_dir():
+                state.event('CODEX_PROMPT_CAPTURE_INCOMPLETE',
+                            {**binding, 'error_type': 'invalid_cwd',
+                             'hook_seconds': time.perf_counter() - started})
+                return {}
+            from helixengine.core.evidence import Store
+            from helixengine.core.workflow_memory import Memory
+            from helixengine.prompt_memory import capture_prompt
+            memory = Memory(Store(Path(data_dir).expanduser().resolve() / 'evidence'))
+            result = capture_prompt(memory, str(Path(cwd).resolve()), event)
+            state.event('CODEX_PROMPT_CAPTURED' if result.get('captured') else 'CODEX_PROMPT_CAPTURE_INCOMPLETE',
+                        {**binding, 'capture': result, 'hook_seconds': time.perf_counter() - started})
+        except Exception as exc:
+            # Original submission remains native even if capture/publication
+            # fails. Never return context, a block, or a synthetic model answer.
+            try:
+                state.event('CODEX_PROMPT_CAPTURE_INCOMPLETE',
+                            {**binding, 'error_type': type(exc).__name__})
+            except Exception:
+                pass
+        return {}
     if kind in ('SubagentStart', 'SubagentStop'):
         state.event('CODEX_' + kind.upper(), binding)
         return {}

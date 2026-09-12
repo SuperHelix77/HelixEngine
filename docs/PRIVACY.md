@@ -5,6 +5,12 @@ environment labels supplied by the caller, receipt identifiers, stdout,
 stderr, hashes, timing, local state, and imported usage records are
 operational data in the configured data directory.
 
+The development Codex adapter can also capture bounded incoming user prompts
+through its explicitly installed `UserPromptSubmit` hook. Exact prompt text is
+kept in local Memory, while telemetry carries references and status. This path
+does not inject historical text or suppress inference. See
+[prompt capture](PROMPT_MEMORY.md) for limits and failure behavior.
+
 The application does not send those records to a remote service as part of
 local routing. Pricing is the one optional internet operation. It reads an
 official pricing document only when a refresh is requested or due. The TLS
