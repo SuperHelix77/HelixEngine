@@ -94,6 +94,17 @@ def _parser():
     replay.add_argument("--limit", type=int, default=50)
     replay.add_argument("--max-bytes", type=int, default=1048576)
 
+    transition = commands.add_parser("transition", help="explicitly arm or inspect a bounded recording workflow")
+    transition_commands = transition.add_subparsers(dest="transition_command", required=True)
+    arm = transition_commands.add_parser("arm")
+    arm.add_argument("spec", help="caller-authorized grant JSON; historical text does not authorize itself")
+    arm.add_argument("--activate-native", action="store_true",
+                     help="opt in this grant to native hook notifications; never enables a generic semantic classifier")
+    arm.add_argument("--transcript", help="exact native transcript at a completed semantic-turn fence")
+    for operation in ("status", "deactivate"):
+        operation_parser = transition_commands.add_parser(operation)
+        operation_parser.add_argument("thread_id")
+
     plan = commands.add_parser("plan", help="explicitly register or invoke a checked named plan")
     plan_commands = plan.add_subparsers(dest="plan_command", required=True)
     register = plan_commands.add_parser("register")
@@ -226,6 +237,36 @@ def main(argv=None):
                 print(_json(jsonable_memory(runtime.memory_retrieve(args.project, args.record_hashes, args.max_bytes))))
             elif args.memory_command == "replay":
                 print(_json(jsonable_memory(runtime.memory_replay(args.project, args.session, args.after, args.limit, args.max_bytes))))
+            return 0
+        if args.command == "transition":
+            from . import native_transitions, transition_gate
+            if args.transition_command == "arm":
+                if args.activate_native and not args.transcript:
+                    raise ValueError("Native activation requires --transcript at a completed semantic-turn fence")
+                raw = Path(args.spec).expanduser().read_bytes()
+                if len(raw) > 256 * 1024:
+                    raise ValueError("Transition grant exceeds 256 KiB")
+                def unique(pairs):
+                    result = {}
+                    for key, value in pairs:
+                        if key in result:
+                            raise ValueError("Duplicate transition grant key")
+                        result[key] = value
+                    return result
+                def invalid_constant(value):
+                    raise ValueError("Nonfinite transition grant value")
+                grant = json.loads(raw, object_pairs_hook=unique, parse_constant=invalid_constant)
+                reference = transition_gate.arm(runtime.memory, grant)
+                result = {"grant_hash": reference, "native_activated": False}
+                if args.activate_native:
+                    result["binding"] = native_transitions.activate(
+                        runtime.data_dir, runtime.memory, reference, transcript_path=args.transcript)
+                    result["native_activated"] = True
+                print(_json(result))
+            elif args.transition_command == "deactivate":
+                print(_json(native_transitions.deactivate(runtime.data_dir, args.thread_id)))
+            else:
+                print(_json(native_transitions.status(runtime.data_dir, args.thread_id)))
             return 0
         if args.command == "plan":
             if args.plan_command == "register":

@@ -1,5 +1,6 @@
-"""One opt-in Codex hook adapter. No inference, approvals, or semantic gating.
-Incoming prompts can be archived exactly; capture never suppresses inference.
+"""One opt-in Codex hook adapter; no inference or general semantic classifier.
+Capture alone never suppresses inference. An explicitly armed recording grant
+may produce a mechanical notification after its exact transition is committed.
 
 Unknown shell syntax uses native execution. Admitted foreground commands use
 Engine capture; TTYs and changed command resolution use native execution.
@@ -108,6 +109,16 @@ def _identity(value):
     return isinstance(value, str) and 0 < len(value) <= 512 and '\x00' not in value
 
 
+def _deactivate_recording(data_dir, thread_id):
+    try:
+        from helixengine.native_transitions import deactivate
+        deactivate(data_dir, thread_id)
+    except Exception:
+        # Continuity/setting-revision checks independently reject reuse after
+        # a native turn proceeds without a committed recording transition.
+        pass
+
+
 def hook(event, data_dir, session_scope=None):
     from helixengine.state import State
     started = time.perf_counter()
@@ -122,12 +133,14 @@ def hook(event, data_dir, session_scope=None):
     binding['thread_id'] = binding.get('agent_id', binding['session_id'])
     if kind == 'UserPromptSubmit':
         if not state.settings()['enabled']:
+            _deactivate_recording(data_dir, binding['thread_id'])
             return {}
         # The caller's native cwd supplies logical memory scope. This is not an
         # access-control boundary or a claim that historical text is authority.
         try:
             cwd = event.get('cwd')
             if not isinstance(cwd, str) or not Path(cwd).is_dir():
+                _deactivate_recording(data_dir, binding['thread_id'])
                 state.event('CODEX_PROMPT_CAPTURE_INCOMPLETE',
                             {**binding, 'error_type': 'invalid_cwd',
                              'hook_seconds': time.perf_counter() - started})
@@ -139,7 +152,10 @@ def hook(event, data_dir, session_scope=None):
             result = capture_prompt(memory, str(Path(cwd).resolve()), event)
             state.event('CODEX_PROMPT_CAPTURED' if result.get('captured') else 'CODEX_PROMPT_CAPTURE_INCOMPLETE',
                         {**binding, 'capture': result, 'hook_seconds': time.perf_counter() - started})
+            from helixengine.native_transitions import dispatch
+            return dispatch(data_dir, memory, result, native_event=event)
         except Exception as exc:
+            _deactivate_recording(data_dir, binding['thread_id'])
             # Original submission remains native even if capture/publication
             # fails. Never return context, a block, or a synthetic model answer.
             try:

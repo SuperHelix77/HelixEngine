@@ -24,7 +24,9 @@ The run appears in the local HUD. Native token counters require explicit usage r
 
 The paragraph above describes published v0.1. Development builds provide an
 optional shared native hook, including capture-only `UserPromptSubmit` handling.
-It preserves exact incoming prompts in local Memory while allowing the native
-turn to proceed. See [capture behavior and validation](../../docs/PROMPT_MEMORY.md).
+It preserves exact incoming prompts in local Memory and defaults to native
+inference. An explicitly armed [recording grant](../../docs/TRANSITION_GATE.md)
+can handle eligible data transitions mechanically. See
+[capture behavior and validation](../../docs/PROMPT_MEMORY.md).
 Installing its configuration is not proof that Codex has trusted or activated it,
 and capture alone does not establish inference savings.

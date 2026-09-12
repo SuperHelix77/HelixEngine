@@ -13,9 +13,11 @@ Telemetry contains references and capture status, not the prompt text.
 Root/child attribution follows native session and agent identities. Project
 scope is logical filtering, not an access-control guarantee.
 
-The hook returns no context and no stopping instruction. Native inference
-continues normally. This is capture, not a semantic-transition gate or a token
-saving mechanism. Archived user text is historical evidence, not a new source
+Capture returns no context and no stopping instruction. With no explicitly
+armed transition grant, native inference continues normally. The shared adapter
+may separately invoke the opt-in [recording transition gate](TRANSITION_GATE.md)
+after capture succeeds. Capture alone is not a token-saving mechanism.
+Archived user text is historical evidence, not a new source
 of execution authority. It is never evaluated or promoted into instructions.
 
 An identical native identity and payload is idempotent. Conflicting payloads,

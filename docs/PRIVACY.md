@@ -7,8 +7,10 @@ operational data in the configured data directory.
 
 The development Codex adapter can also capture bounded incoming user prompts
 through its explicitly installed `UserPromptSubmit` hook. Exact prompt text is
-kept in local Memory, while telemetry carries references and status. This path
-does not inject historical text or suppress inference. See
+kept in local Memory, while telemetry carries references and status. Capture alone
+does not inject historical text or suppress inference. A separately armed
+[recording grant](TRANSITION_GATE.md) can produce a mechanical stop notification
+after its bound transition commits. See
 [prompt capture](PROMPT_MEMORY.md) for limits and failure behavior.
 
 The application does not send those records to a remote service as part of
