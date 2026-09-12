@@ -22,7 +22,7 @@ def test_index_failure_preserves_command_then_recovery_never_executes_it(tmp_pat
         str(marker)], tmp_path, origin={'session_id': 'parent', 'thread_id': 'child',
                                       'agent_id': 'child', 'hook_cwd': str(tmp_path)})
     assert marker.read_text() == 'x' and result['exit_code'] == 7
-    assert runtime.visible_output(result) == (b'exact result\n', b'')
+    assert runtime.visible_output(result) == (('exact result' + os.linesep).encode(), b'')
     assert result['memory']['error'] and result['memory']['backlog'] == 1
     monkeypatch.setattr(runtime.memory, 'record', original)
     runtime.close()
@@ -45,7 +45,7 @@ def test_switch_off_retains_evidence_without_automatic_memory_indexing(tmp_path)
     runtime.switch(False, runtime.settings()['revision'])
     result = runtime.run([sys.executable, '-c', "print('raw')"], tmp_path)
     assert result['memory'] is None and result['receipt']
-    assert runtime.visible_output(result) == (b'raw\n', b'')
+    assert runtime.visible_output(result) == (('raw' + os.linesep).encode(), b'')
     report = runtime.memory_sync()
     assert report['processed'] == 0 and report['skipped_off'] == 1
     assert runtime.memory.timeline(str(tmp_path), 'engine-local') == []
@@ -103,5 +103,5 @@ def test_memory_cli_exposes_durable_status_and_no_execution_recovery(tmp_path):
     assert json.loads(sync.stdout)['processed'] == 1
     restored = Runtime(tmp_path / 'data')
     assert restored.state.snapshot()['total_runs'] == 1
-    assert restored.store.retrieve(result['receipt'], 'stdout')['text'] == 'retained\n'
+    assert restored.store.retrieve(result['receipt'], 'stdout')['text'] == 'retained' + os.linesep
     restored.close()
