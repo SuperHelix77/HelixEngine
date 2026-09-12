@@ -47,6 +47,11 @@ def main():
                 page.on('pageerror',lambda e:errors.append(str(e)))
                 page.goto(url)
                 expect(page.locator('.model-card')).to_have_count(len(initial_state['release']['lanes']))
+                unpaired = page.locator('.model-card').filter(has_text='Recording / installed semantic re-entry pilot')
+                expect(unpaired).to_contain_text('Unpaired · route failed')
+                expect(unpaired).to_contain_text('Attempt input: 213,670 tokens · Attempt output: 1,013 tokens')
+                assert unpaired.locator('.card-values strong').all_text_contents() == ['—', '—', '—']
+                expect(page.locator('#cost-table')).to_contain_text('Not run')
                 expect(page.locator('#engine-switch')).to_be_enabled()
                 assert page.locator('#engine-switch').is_checked()
                 page.locator('label[for="engine-switch"]').click()

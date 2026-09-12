@@ -1,0 +1,42 @@
+{
+  "id": "astra-high-recording-reentry",
+  "model": "gpt-6-astra",
+  "effort": "high",
+  "task": "Recording / installed semantic re-entry pilot",
+  "policy": "Explicit native recording grant; capability change forced native fallback",
+  "state": "UNPAIRED_ROUTE_FAILURE",
+  "gate": "Correct observed normal answer; 0/3 expected recording stops; no control or parity qualification",
+  "model_wide_parity": false,
+  "release_median": null,
+  "paired_tasks": 0,
+  "attempts": 1,
+  "fixed_cohort_cells": 7,
+  "final_contract": "Normal model-written prose; same High effort and ordinary tools.",
+  "report_url": "https://github.com/SuperHelix77/HelixEngine/blob/codex/research-hub-observer/docs/research/ASTRA_RECORDING_REENTRY_20260912.md",
+  "report_sha256": "8260277f11a1d37bedd4448e57cf93ef6ddf74bb0f2a34c0b0403baa714b161e",
+  "arms": [
+    {
+      "arm": "on",
+      "usage": {
+        "input_tokens": 213670,
+        "cached_input_tokens": 198528,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1013,
+        "reasoning_output_tokens": 0
+      },
+      "native_sha256": "195d53922c955a190c63f495127f97233faf59c0177ced2b90cdbea32a76805e",
+      "seconds": 62.98682029199699,
+      "final_sha256": "6266b5aa904b915d54f5533544cb936c79062a38b8484bbcdbc723f8ef6fbb77",
+      "final_url": "https://github.com/SuperHelix77/HelixEngine/blob/codex/research-hub-observer/docs/research/ASTRA_RECORDING_REENTRY_20260912.md#final-answer-and-scope",
+      "engine_runs": 0,
+      "recorded_transitions": 0
+    }
+  ],
+  "limits": [
+    "One failed candidate attempt, no native control; savings remain unknown.",
+    "New host-skills instructions invalidated continuity; no observed inference suppression.",
+    "Final strings do not establish artifact/workflow parity or suppressed-history recovery.",
+    "Research workers, preparation and local overhead are additional and not claimed free."
+  ],
+  "cost_scope": "Native attempt usage only; total effective research cost and included-plan quota unknown."
+}

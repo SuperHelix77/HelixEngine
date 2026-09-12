@@ -103,7 +103,9 @@ function capsuleCard(lane) {
   const title = element('div', null, 'card-title');
   const laneState = String(lane?.state || '').toUpperCase();
   const arms = Array.isArray(lane?.arms) ? lane.arms : [];
-  const badge = laneState.startsWith('REJECTED') ? 'Rejected · N = 1' : arms.length ? 'N = 1 · development' : 'Pending';
+  const badge = laneState === 'UNPAIRED_ROUTE_FAILURE'
+    ? 'Unpaired · route failed'
+    : laneState.startsWith('REJECTED') ? 'Rejected · N = 1' : arms.length ? 'N = 1 · development' : 'Pending';
   title.append(element('h3', modelName(lane)), element('span', badge, 'badge'));
   card.append(title);
   card.append(element('p', lane?.task || 'Task description unavailable', 'task'));
@@ -118,6 +120,10 @@ function capsuleCard(lane) {
     values.append(cell);
   }
   card.append(values);
+  if (laneState === 'UNPAIRED_ROUTE_FAILURE') {
+    const attempt = arms.find(arm => arm?.arm === 'on')?.usage || {};
+    card.append(element('p', `Attempt input: ${formatInteger(attempt.input_tokens)} tokens · Attempt output: ${formatInteger(attempt.output_tokens)} tokens`, 'small'));
+  }
 
   const gate = lane?.gate || lane?.comparison_gate || 'Gate not reported';
   card.append(element('p', `Gate: ${gate}`, 'gate'));
@@ -141,7 +147,7 @@ function capsuleCard(lane) {
   card.append(details);
 
   const links = element('div', null, 'receipt-links');
-  if (lane?.report_url) links.append(safeLink('Paired receipt ↗', lane.report_url));
+  if (lane?.report_url) links.append(safeLink(laneState === 'UNPAIRED_ROUTE_FAILURE' ? 'Attempt receipt ↗' : 'Paired receipt ↗', lane.report_url));
   if (lane?.review_url) links.append(safeLink('Semantic review ↗', lane.review_url));
   if (links.children.length) card.append(links);
   const hash = typeof lane?.capsule_sha256 === 'string' ? lane.capsule_sha256.slice(0, 16) : 'unavailable';
@@ -170,23 +176,24 @@ function costView() {
   const tier = $('tariff').value;
 
   for (const lane of visibleLanes()) {
+    const unpairedRouteFailure = String(lane?.state || '').toUpperCase() === 'UNPAIRED_ROUTE_FAILURE';
     const control = fresh ? number(lane?.costs?.off?.[tier]) : null;
     const helix = fresh ? number(lane?.costs?.on?.[tier]) : null;
-    const saved = control != null && control > 0 && helix != null ? 100 * (1 - helix / control) : null;
+    const saved = !unpairedRouteFailure && control != null && control > 0 && helix != null ? 100 * (1 - helix / control) : null;
     const row = document.createElement('tr');
     const values = [
       `${modelName(lane)} / ${lane?.task || 'Task unavailable'}`,
       formatPercent(lane?.savings?.input_tokens),
       formatPercent(lane?.savings?.output_tokens),
       formatPercent(lane?.savings?.uncached_input_tokens),
-      control == null ? 'Unpriced' : `$${control.toFixed(4)}`,
+      unpairedRouteFailure ? 'Not run' : control == null ? 'Unpriced' : `$${control.toFixed(4)}`,
       helix == null ? 'Unpriced' : `$${helix.toFixed(4)}`,
       formatPercent(saved)
     ];
     for (const value of values) row.append(element('td', value));
     $('cost-table').append(row);
 
-    if (control != null && control > 0 && helix != null && helix >= 0) {
+    if (!unpairedRouteFailure && control != null && control > 0 && helix != null && helix >= 0) {
       const ratio = helix / control;
       const track = element('div', null, 'track');
       const bar = element('div', null, `bar${ratio > 1 ? ' negative' : ''}`);

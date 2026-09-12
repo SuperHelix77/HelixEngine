@@ -35,8 +35,14 @@ def project(read_bytes, directory=None):
                 arms = {a['arm']: a for a in lane.get('arms', [])}
                 if len(arms) != len(lane.get('arms', [])):
                     raise ValueError('Duplicate evidence arm')
-                if arms:
-                    if set(arms) != {'off', 'on'}:
+                arm_names = set(arms)
+                if lane.get('state') == 'UNPAIRED_ROUTE_FAILURE':
+                    paired_tasks = lane.get('paired_tasks')
+                    if arm_names != {'on'} or type(paired_tasks) is not int or paired_tasks != 0:
+                        raise ValueError('Incomplete pair')
+                    lane['savings'] = None
+                elif arms:
+                    if arm_names != {'off', 'on'}:
                         raise ValueError('Incomplete pair')
                     a, b = arms['off']['usage'], arms['on']['usage']
                     def delta(x, y): return 100 * (1 - y / x) if x else None
