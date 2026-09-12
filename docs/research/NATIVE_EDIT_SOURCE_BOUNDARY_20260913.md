@@ -134,11 +134,60 @@ not stable latency predictions or full effective-cost accounting. In particular,
 `archive_bytes` is logical archived input; `store_io` records the measured
 object traffic, including deduplicated writes.
 
-**Remaining gate:** this smoke invoked the installed hook command directly.
-It did not prove native hook approval/dispatch or packet delivery into the real
-desktop request. Telemetry deliberately says `hook_response_not_wire_verified`.
-Native economics, semantic parity and self-activation remain unqualified.
-No production source opt-in or model-setting change was made for the root agent.
+That smoke invoked the installed hook command directly and did not prove native
+dispatch. The subsequent native-client experiment below closes that delivery
+gap for the tested isolated root-session path. Runtime telemetry still says
+`hook_response_not_wire_verified`: an individual hook response cannot infer
+whether its caller subsequently serialized it successfully.
+Native economics, semantic parity, live desktop/root attachment and self-activation
+remain unqualified. No production source opt-in or root model setting changed.
+
+## Native-client source delivery
+
+Using the installed Codex 0.153.4 client, the root reviewed the four shared hook
+definitions through the normal CLI `/hooks` UI in an isolated home/project.
+Native `hooks/list` then reported all four enabled and trusted. No trust hashes
+were hand-written, no managed-policy override was introduced, and no hook-trust
+bypass flag was used. This is test-project approval, not approval or attachment
+of the current desktop conversation.
+
+A Luna worker ran three fresh native threads against an auth-free loopback
+Responses mock. Each sent exactly one provider request and received one scripted
+ordinary final message. The submitted 93-byte user prompt remained unchanged.
+
+| Case | Exact source in first request | Packet bytes | Request bytes |
+|---|---:|---:|---:|
+| Configured source V1 | 3 files, 677 bytes | 1,818 | 49,736 |
+| Source V2 after changing `solution.py` | 3 files, 700 bytes | 1,843 | 49,763 |
+| Engine OFF | No source packet | 0 | 47,694 |
+
+The root independently decoded the stored requests, checked the developer
+message's quoted-evidence wrapper, and verified every source byte/hash against
+the archived objects. Both old and new source versions remain recoverable.
+The runner sent only the user prompt through `turn/start`; it did not inject
+the expected packet itself. The configured native hook supplied it.
+
+These are serialized byte counts, not token or monetary savings. The candidate
+adds source context; savings require that a real model then avoids more expensive
+rediscovery while preserving its investigation and normal final answer. Quoted
+data in developer transport is not itself proof of semantic resistance to source
+instructions. Subagent source delivery through the actual native creation path
+also remains a separate gate.
+
+The original probe used an uninstrumented `elapsed_seconds: 0` placeholder.
+Root audit rejects it as a timing observation: elapsed time is **UNKNOWN**.
+The original receipt and executed harness are retained; the future harness now
+uses null. No hosted model calls or authorization headers were used. Parent and
+worker research inference is still research overhead, not zero-cost work.
+
+Exact artifacts: `research/source-hook-native-wire-20260913/RESULT.json`,
+`ROOT_AUDIT.json`, `NATIVE_REVIEW.json`, and each case's raw `request.json`.
+V1 request SHA-256:
+`a3802870b0be0bd39ae1cbbd4abcc52371004ba52c6ca374312d58c2c5fa78c4`.
+V2 request SHA-256:
+`1ebaebf3a5770af2011b0586eabf54829ec63dd2b4ddd3779926379ffcc2b72f`.
+OFF request SHA-256:
+`7e5a075f4ebefe75b23302f46f53b86e05d16ced7934ebf527b4614ebaaf70b7`.
 
 ## Ordinary unittest routing gap
 
@@ -159,6 +208,9 @@ probe retains its earlier frozen installed wheel so the two changes cannot be
 silently conflated.
 The fresh installed wheel passed 462 tests in 16.09 seconds locally; its SHA-256
 is `6d9eaef44371632e442e1b8435e36a8a5faaaf9e79e86890f88d85f2d54afacd`.
+All seven [CI jobs for `ce9c711`](https://github.com/SuperHelix77/HelixEngine/actions/runs/34721825673)
+passed. Native unittest interception/delivery must still be checked before
+crediting this route in a real model comparison.
 
 ## Evidence
 
