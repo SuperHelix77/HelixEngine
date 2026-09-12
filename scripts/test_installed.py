@@ -81,19 +81,24 @@ def main() -> int:
         if "usage:" not in help_result.stdout.lower():
             raise SystemExit(f"console help did not contain usage:\n{help_result.stdout}")
 
-        test_result = _run(
+        # Stream test progress and timeout stacks so a platform hang cannot
+        # hide its last test behind the outer process timeout.
+        test_result = subprocess.run(
             [
                 sys.executable,
                 "-m",
                 "pytest",
-                "-q",
+                "-v",
+                "-o", "faulthandler_timeout=45",
                 "--import-mode=importlib",
                 str(ROOT / "tests"),
             ],
             cwd=outside,
-            environment=environment,
+            env=environment,
+            timeout=240,
         )
-        print(test_result.stdout.strip())
+        if test_result.returncode:
+            raise SystemExit(test_result.returncode)
 
     print(json.dumps({"installed_module": str(module_file), "console": str(console_path), "outside": True}))
     return 0

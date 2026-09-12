@@ -16,7 +16,9 @@ def test_http_switch_controls_new_runs_without_rerun(tmp_path, monkeypatch):
         port = sock.getsockname()[1]
     origin = f'http://127.0.0.1:{port}'
     args = [sys.executable, '-m', 'helixengine', '--data-dir', str(tmp_path/'data')]
-    server = subprocess.Popen(args + ['serve', '--port', str(port)], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    server = subprocess.Popen([sys.executable, '-c',
+        'import faulthandler; faulthandler.dump_traceback_later(10); from helixengine.cli import main; raise SystemExit(main())',
+        *args[3:], 'serve', '--port', str(port)], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
     def request(path='/api/release-state', data=None, token=None, claimed_origin=None):
         headers = {}
@@ -34,7 +36,13 @@ def test_http_switch_controls_new_runs_without_rerun(tmp_path, monkeypatch):
                 break
             except (URLError, ConnectionError):
                 if server.poll() is not None or time.monotonic() > deadline:
-                    raise AssertionError('Server did not start')
+                    server.terminate()
+                    try:
+                        _, diagnostic = server.communicate(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        server.kill()
+                        _, diagnostic = server.communicate(timeout=5)
+                    raise AssertionError(f'Server did not start; exit={server.returncode}; stderr={diagnostic.decode(errors="replace")}')
                 time.sleep(.1)
         for path in ['/research', '/api/state', '/../../pyproject.toml']:
             try:
