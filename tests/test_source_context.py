@@ -2,7 +2,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -229,7 +229,7 @@ def test_invalid_configuration_and_publication_failure_preserve_previous_config(
     assert source_context.status(data, project)["paths"] == ["one.txt"]
 
 
-def test_changed_source_is_rebound_to_new_exact_reference(tmp_path, monkeypatch):
+def test_changed_source_is_rebound_to_new_exact_reference(tmp_path):
     project, data, store = _setup(tmp_path)
     source = project / "source.txt"
     first = b"first\r\n"
@@ -238,25 +238,47 @@ def test_changed_source_is_rebound_to_new_exact_reference(tmp_path, monkeypatch)
     source_context.configure(data, project, ["source.txt"])
     one = source_context.prepare(data, project, store)
     source.write_bytes(second)
-    stamps = []
-    original_stamp = source_context._path_stamp
-    def traced_stamp(value):
-        stamp = original_stamp(value)
-        caller = sys._getframe(1)
-        stamps.append({'at': caller.f_lineno, 'stamp': stamp,
-                       'birthtime_ns': getattr(value, 'st_birthtime_ns', None)})
-        return stamp
-    monkeypatch.setattr(source_context, '_path_stamp', traced_stamp)
     two = source_context.prepare(data, project, store)
-    if two['context'] is None:
-        print('SOURCE_STAT_DIAGNOSTIC=' + json.dumps(stamps))
-    assert two['context'] is not None, {'report': two['report'], 'stamps': stamps}
+    assert two['context'] is not None, two['report']
     first_entry = json.loads(one["context"])["files"][0]
     second_entry = json.loads(two["context"])["files"][0]
     assert first_entry["sha256"] != second_entry["sha256"]
     assert store.get(first_entry["sha256"]) == first
     assert store.get(second_entry["sha256"]) == second
     assert second_entry["object_path"] == str(store.root / "objects" / second_entry["sha256"])
+
+
+@pytest.mark.parametrize('handle_changed', [False, True])
+def test_windows_cross_api_time_binding_keeps_handle_change_detection(tmp_path, monkeypatch, handle_changed):
+    project, data, store = _setup(tmp_path)
+    (project / 'source.txt').write_bytes(b'exact source\r\n')
+    source_context.configure(data, project, ['source.txt'])
+    fd_calls = 0
+
+    def stamp(value, ctime):
+        fields = {key: getattr(value, key) for key in dir(value) if key.startswith('st_')}
+        fields.update(st_ctime_ns=ctime, st_birthtime_ns=10)
+        return SimpleNamespace(**fields)
+
+    def path_stat(path):
+        return stamp(os.lstat(path), 10)
+
+    def fd_stat(fd):
+        nonlocal fd_calls
+        fd_calls += 1
+        return stamp(os.fstat(fd), 20 + int(handle_changed and fd_calls > 1))
+
+    # Model the observed Windows 3.13 discrepancy without changing global os
+    # or pathlib platform selection. A change-time-only mutation must reject.
+    proxy = SimpleNamespace(**{**vars(os), 'name': 'nt', 'lstat': path_stat, 'fstat': fd_stat})
+    monkeypatch.setattr(source_context, 'os', proxy)
+    result = source_context.prepare(data, project, store)
+    assert fd_calls == 2
+    if handle_changed:
+        assert result['context'] is None
+        assert result['report']['failure_code'] == 'source_changed_during_read'
+    else:
+        assert json.loads(result['context'])['files'][0]['content'] == 'exact source\r\n'
 
 
 def test_stat_change_during_read_returns_no_packet(tmp_path, monkeypatch):

@@ -127,9 +127,15 @@ def _relative_parts(value: os.PathLike[str] | str) -> tuple[str, tuple[str, ...]
     return raw, parts
 
 
-def _path_stamp(value: os.stat_result) -> tuple[int, ...]:
+def _path_stamp(value: os.stat_result, *, cross_api: bool = False) -> tuple[int, ...]:
     """Bind identity and ordinary metadata used for a read consistency check."""
 
+    # Windows 3.13 can expose creation time as lstat.st_ctime but change
+    # time as fstat.st_ctime. Compare creation time only across those APIs.
+    # Same-API before/after checks below still retain the full change stamp.
+    timestamp = value.st_ctime_ns
+    if cross_api and os.name == "nt":
+        timestamp = getattr(value, "st_birthtime_ns", timestamp)
     return (
         int(value.st_dev),
         int(value.st_ino),
@@ -137,7 +143,7 @@ def _path_stamp(value: os.stat_result) -> tuple[int, ...]:
         int(value.st_nlink),
         int(value.st_size),
         int(value.st_mtime_ns),
-        int(value.st_ctime_ns),
+        int(timestamp),
     )
 
 
@@ -471,7 +477,7 @@ def _read_source(
         opened = os.fstat(fd)
         if not stat.S_ISREG(opened.st_mode):
             raise _SourceFailure("source_not_regular")
-        if _path_stamp(opened) != _path_stamp(before):
+        if _path_stamp(opened, cross_api=True) != _path_stamp(before, cross_api=True):
             raise _SourceFailure("source_changed_during_read")
         remaining = int(before.st_size)
         while remaining:
@@ -489,7 +495,7 @@ def _read_source(
             raise _SourceFailure("source_changed_during_read", total) from exc
         if (
             total != before.st_size
-            or _path_stamp(after_fd) != _path_stamp(before)
+            or _path_stamp(after_fd) != _path_stamp(opened)
             or _path_stamp(after_path) != _path_stamp(before)
         ):
             raise _SourceFailure("source_changed_during_read", total)

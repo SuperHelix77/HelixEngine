@@ -1,5 +1,27 @@
 # Native edit batching and the remaining source boundary
 
+## Windows read-consistency correction
+
+Windows Python 3.13 CI rejected stable rewritten source before reading it.
+The diagnostic at commit `341af49` recorded equal device, inode, mode, link
+count, size, modification time and birthtime, but unequal `st_ctime_ns`:
+path lookup reported creation time `1789249628564080500`, while the open
+descriptor reported change time `1789249628580347000`.
+[Diagnostic CI](https://github.com/SuperHelix77/HelixEngine/actions/runs/34720860503).
+
+This matches CPython's distinct path and descriptor implementations:
+[path stat](https://github.com/python/cpython/blob/v3.13.0/Modules/posixmodule.c#L2160-L2203),
+[descriptor stat](https://github.com/python/cpython/blob/v3.13.0/Python/fileutils.c#L1111-L1288).
+The correction uses birthtime for Windows cross-API comparisons when available,
+while comparing descriptor before/after stamps with their full change time.
+Path before/after and whole-set consistency fences remain in place. A synthetic
+cross-API discrepancy succeeds; a descriptor change-time-only mutation still
+rejects the packet. These are capture-time consistency checks, not a filesystem
+transaction or a guarantee against a malicious writer restoring metadata.
+
+This compatibility repair does not qualify native source delivery, capability
+parity, or token savings. Self-activation remains gated on those separate checks.
+
 ## Observed execution result
 
 The local installed-client probe replaced a generated Python file-write and
