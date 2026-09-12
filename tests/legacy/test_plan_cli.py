@@ -3,7 +3,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from test_named_plans import setup
+from .test_named_plans import setup
 
 
 CLI='helixengine.core.plan_cli'
