@@ -206,8 +206,19 @@ def reduce_stream(raw, kind, limit=8):
         elif kind == "compiler":
             if re.search(r"(?:^|\s)(?:fatal error|error|warning):", line):
                 diagnostics.append({"line": number, "text": line})
-        elif re.search(r"(?i)\b(error|failed|failure|warning|exception|panic)\b", line):
-            diagnostics.append({"line": number, "text": line})
+        else:
+            # unittest has a different trailer and failure label from pytest.
+            # Preserve its literal summary and indexed failures in generic
+            # command output; these are observations, not semantic approval.
+            if re.fullmatch(r"Ran [0-9]+ tests? in [0-9.]+s", line) or re.fullmatch(
+                r"(?:OK|FAILED)(?: \([^\r\n]*\))?|NO TESTS RAN", line
+            ):
+                counts.append({"line": number, "text": line})
+            if re.match(r"^(?:FAIL|ERROR):\s+", line):
+                diagnostics.append({"line": number, "text": line})
+                sections.append({"start": number, "header": line})
+            elif re.search(r"(?i)\b(error|failed|failure|warning|exception|panic)\b", line):
+                diagnostics.append({"line": number, "text": line})
     for number, section in enumerate(sections):
         section["end"] = sections[number + 1]["start"] - 1 if number + 1 < len(sections) else len(lines)
     result.update(
