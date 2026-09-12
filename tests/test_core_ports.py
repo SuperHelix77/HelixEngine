@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import sys
 import time
+from types import SimpleNamespace
 
 import pytest
 
@@ -12,6 +13,20 @@ from helixengine.core.evidence import Store, capture
 from helixengine.core.line_index import build, retrieve
 from helixengine.core import plan_dependencies as dep
 from helixengine.core.workflow_memory import Memory
+
+
+def test_windows_stamp_ignores_only_synthetic_execute_bits(monkeypatch):
+    fields = dict(st_dev=1, st_ino=2, st_size=3, st_mtime_ns=4, st_ctime_ns=5)
+    path_stat = SimpleNamespace(**fields, st_mode=0o100777)
+    fd_stat = SimpleNamespace(**fields, st_mode=0o100666)
+    monkeypatch.setattr(dep, 'WINDOWS', True)
+    assert dep.stamp(path_stat) == dep.stamp(fd_stat)
+    for field in fields:
+        changed = SimpleNamespace(**{**fields, field: 999}, st_mode=fd_stat.st_mode)
+        assert dep.stamp(path_stat) != dep.stamp(changed)
+    assert dep.stamp(path_stat) != dep.stamp(SimpleNamespace(**fields, st_mode=0o100444))
+    monkeypatch.setattr(dep, 'WINDOWS', False)
+    assert dep.stamp(path_stat) != dep.stamp(fd_stat)
 
 
 def test_all_copied_core_ports_import_as_package():
@@ -64,7 +79,7 @@ def test_capture_calls_cleanup_and_keeps_child_once(tmp_path):
     )
     assert events[0][0] == "start" and events[-1] == "cleanup"
     assert store.receipt(receipt)["exit_code"] == 0
-    assert store.get(store.receipt(receipt)["stdout"]["sha256"]) == b"captured\n"
+    assert store.get(store.receipt(receipt)["stdout"]["sha256"]) == b"captured" + os.linesep.encode()
     assert store.receipt(receipt)["descendant_cleanup"]["attempted"] is True
 
 

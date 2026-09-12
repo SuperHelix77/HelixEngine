@@ -1,7 +1,9 @@
-import sys,json
+import os,sys,json
 import pytest
 from helixengine.core.evidence import Store
 from helixengine.core.checked_steps import execute
+
+NATIVE_NEWLINE=os.linesep
 
 
 def step(name,code):return {'name':name,'argv':[sys.executable,'-c',code]}
@@ -9,17 +11,17 @@ def step(name,code):return {'name':name,'argv':[sys.executable,'-c',code]}
 
 def test_failure_is_not_masked_and_next_step_never_runs(tmp_path):
  s=Store(tmp_path/'s')
- r=execute(s,[step('check','import sys;print("verification failed");sys.exit(7)'),step('later','from pathlib import Path;Path("should_not_exist").write_text("ran")')],tmp_path,'test')
+ r=execute(s,[step('check','import sys;print("verification failed");sys.exit(7)'),step('later','from pathlib import Path;Path("should_not_exist").write_text("ran",encoding="utf-8")')],tmp_path,'test')
  assert not r['process_success'] and r['steps'][0]['exit_code']==7
  assert r['unexecuted']==['later'] and not (tmp_path/'should_not_exist').exists()
- assert s.retrieve(r['steps'][0]['receipt'])['text']=='verification failed\n'
+ assert s.retrieve(r['steps'][0]['receipt'])['text']==f'verification failed{NATIVE_NEWLINE}'
  assert json.loads(s.get(r['sequence_receipt']['sha256']))['process_success'] is False
 
 
 def test_all_success_preserves_individual_evidence(tmp_path):
  s=Store(tmp_path/'s');r=execute(s,[step('a','print("000.250")'),step('b','print("false")')],tmp_path,'test')
  assert r['process_success'] and not r['unexecuted']
- assert [s.retrieve(x['receipt'])['text'] for x in r['steps']]==['000.250\n','false\n']
+ assert [s.retrieve(x['receipt'])['text'] for x in r['steps']]==[f'000.250{NATIVE_NEWLINE}',f'false{NATIVE_NEWLINE}']
 
 
 def test_invalid_later_step_has_no_early_side_effect(tmp_path):

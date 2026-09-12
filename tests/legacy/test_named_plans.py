@@ -3,6 +3,12 @@ from pathlib import Path
 import pytest
 from helixengine.core.evidence import Store
 
+NATIVE_NEWLINE=os.linesep
+
+
+def _write_text(path,text):
+    path.write_text(text,encoding='utf-8')
+
 
 def api():
     assert importlib.util.find_spec('helixengine.core.named_plans') is not None, 'named-plan API not implemented'
@@ -12,10 +18,10 @@ def api():
 
 def setup(tmp_path,code='from pathlib import Path;print(Path("input.txt").read_text())'):
     root=tmp_path/'project';root.mkdir()
-    (root/'input.txt').write_text('000.250')
-    (root/'job.py').write_text(code)
-    (root/'schema.json').write_text('{"type":"string"}')
-    (root/'config.json').write_text('{"mode":"exact"}')
+    _write_text(root/'input.txt','000.250')
+    _write_text(root/'job.py',code)
+    _write_text(root/'schema.json','{"type":"string"}')
+    _write_text(root/'config.json','{"mode":"exact"}')
     store=Store(tmp_path/'store')
     opts=dict(cwd=root,steps=[{'name':'job','argv':['python','-I','-S','job.py']}],files={'input.txt':'input','job.py':'script','schema.json':'schema','config.json':'config'},executables={'python':sys.executable},env_names=['HELIX_TEST'],environment={'HELIX_TEST':'secret-test-value'})
     ref=api().register(store,'sample',1,**opts)
@@ -26,7 +32,7 @@ def test_identity_is_immutable_and_versions_coexist(tmp_path):
     s,root,opts,ref=setup(tmp_path)
     assert ref['plan_id']=='sample' and ref['plan_version']==1 and len(ref['plan_hash'])==64
     assert api().register(s,'sample',1,**opts)==ref
-    (root/'input.txt').write_text('changed')
+    _write_text(root/'input.txt','changed')
     with pytest.raises(ValueError,match='identity'):api().register(s,'sample',1,**opts)
     other=api().register(s,'sample',2,**opts)
     assert other['plan_hash']!=ref['plan_hash']
@@ -39,7 +45,7 @@ def test_exact_execution_and_success_publication(tmp_path):
     r=api().invoke(s,ref,environment=opts['environment'])
     assert r['status']=='SUCCEEDED' and r['semantic_success'] is None
     assert api().latest_success(s,ref)==r['attempt_hash']
-    assert s.retrieve(r['steps'][0]['receipt'])['text']=='000.250\n'
+    assert s.retrieve(r['steps'][0]['receipt'])['text']==f'000.250{NATIVE_NEWLINE}'
     assert r['costs']['validation']['bytes_read']>0
     assert r['costs']['snapshot']['bytes_written']>0
     assert r['costs']['native_input_tokens'] is None
@@ -49,7 +55,7 @@ def test_exact_execution_and_success_publication(tmp_path):
 @pytest.mark.parametrize('file',['input.txt','job.py','schema.json','config.json'])
 def test_changed_declared_file_fails_before_execution(tmp_path,file):
     s,root,opts,ref=setup(tmp_path)
-    (root/file).write_text('changed')
+    _write_text(root/file,'changed')
     r=api().invoke(s,ref,environment=opts['environment'])
     assert r['status']=='FAILED' and r['steps']==[]
     assert api().latest_success(s,ref) is None
@@ -61,7 +67,7 @@ def test_environment_is_bound_and_only_declared_values_reach_child(tmp_path):
     assert r['status']=='FAILED' and not r['steps']
     r=api().invoke(s,ref,environment={**opts['environment'],'UNDECLARED_SECRET':'do-not-inherit'})
     assert r['status']=='SUCCEEDED'
-    assert s.retrieve(r['steps'][0]['receipt'])['text']=='secret-test-value\nNone\n'
+    assert s.retrieve(r['steps'][0]['receipt'])['text']==f'secret-test-value{NATIVE_NEWLINE}None{NATIVE_NEWLINE}'
 
 
 def test_changed_executable_is_rejected(tmp_path):
@@ -85,19 +91,19 @@ def test_nonzero_step_keeps_last_success_and_retains_failure(tmp_path):
     first=api().invoke(s,ref,environment=opts['environment'])
     # Same immutable plan, later failure caused by a task-owned external condition.
     # This tests publication, not undeclared-dependency applicability.
-    (root/'job.py').write_text('import sys;print("failed evidence");sys.exit(7)')
+    _write_text(root/'job.py','import sys;print("failed evidence");sys.exit(7)')
     bad=api().register(s,'sample',2,**opts)
     r=api().invoke(s,bad,environment=opts['environment'])
     assert r['status']=='FAILED' and r['steps'][0]['exit_code']==7
     assert api().latest_success(s,ref)==first['attempt_hash']
     assert api().latest_success(s,bad) is None
-    assert s.retrieve(r['steps'][0]['receipt'])['text']=='failed evidence\n'
+    assert s.retrieve(r['steps'][0]['receipt'])['text']==f'failed evidence{NATIVE_NEWLINE}'
 
 
 def test_original_edit_between_steps_invalidates_even_if_restored(tmp_path):
     s,root,opts,ref=setup(tmp_path)
     path=str(root/'input.txt')
-    (root/'job.py').write_text('from pathlib import Path\np=Path('+repr(path)+')\nb=p.read_bytes()\np.write_bytes(b"other")\np.write_bytes(b)\n')
+    _write_text(root/'job.py','from pathlib import Path\np=Path('+repr(path)+')\nb=p.read_bytes()\np.write_bytes(b"other")\np.write_bytes(b)\n')
     opts['steps'].append({'name':'must-not-run','argv':['python','-c','from pathlib import Path;Path("bad").touch()']})
     ref=api().register(s,'race',1,**opts)
     r=api().invoke(s,ref,environment=opts['environment'])
@@ -107,7 +113,7 @@ def test_original_edit_between_steps_invalidates_even_if_restored(tmp_path):
 
 
 def test_snapshot_change_is_not_published(tmp_path):
-    s,root,opts,ref=setup(tmp_path,'from pathlib import Path;Path("input.txt").write_text("mutated")')
+    s,root,opts,ref=setup(tmp_path,'from pathlib import Path;Path("input.txt").write_text("mutated",encoding="utf-8")')
     r=api().invoke(s,ref,environment=opts['environment'])
     assert r['status']=='FAILED' and api().latest_success(s,ref) is None
     assert (root/'input.txt').read_text()=='000.250'
@@ -148,7 +154,7 @@ def test_source_changed_while_archiving_attempt_cannot_publish_success(tmp_path,
     def change_on_receipt(data):
         result=put(data)
         if b'"schema":"helix.plan_attempt.v1"' in data:
-            (root/'input.txt').write_text('changed during publication')
+            _write_text(root/'input.txt','changed during publication')
         return result
     monkeypatch.setattr(s,'put',change_on_receipt)
     result=api().invoke(s,ref,environment=opts['environment'])
@@ -163,7 +169,7 @@ def test_registration_rechecks_dependency_closure(tmp_path,monkeypatch):
     def change_on_manifest(data):
         result=put(data)
         if b'"schema":"helix.named_plan.v1"' in data:
-            (root/'input.txt').write_text('changed during registration')
+            _write_text(root/'input.txt','changed during registration')
         return result
     monkeypatch.setattr(s,'put',change_on_manifest)
     with pytest.raises(ValueError,match='invalidated'):
@@ -181,7 +187,7 @@ def test_declared_sources_recoverable_after_original_removed(tmp_path):
 
 
 def test_release_explicitly_finished_workspace_inputs_keeps_outputs(tmp_path):
-    s,root,opts,ref=setup(tmp_path,'from pathlib import Path;Path("output.txt").write_text("answer");print("ok")')
+    s,root,opts,ref=setup(tmp_path,'from pathlib import Path;Path("output.txt").write_text("answer",encoding="utf-8");print("ok")')
     result=api().invoke(s,ref,environment=opts['environment'])
     workspace=Path(result['workspace'])
     assert (workspace/'input.txt').exists() # Invocation never implicitly cleans.
@@ -195,7 +201,7 @@ def test_release_explicitly_finished_workspace_inputs_keeps_outputs(tmp_path):
 def test_release_rejects_changed_snapshot_before_any_deletion(tmp_path):
     s,root,opts,ref=setup(tmp_path)
     result=api().invoke(s,ref,environment=opts['environment'])
-    workspace=Path(result['workspace']);(workspace/'schema.json').write_text('changed')
+    workspace=Path(result['workspace']);_write_text(workspace/'schema.json','changed')
     with pytest.raises(ValueError):api().release_inputs(s,ref,result['attempt_hash'])
     assert (workspace/'input.txt').exists()
 
@@ -233,19 +239,19 @@ def test_release_partial_filesystem_failure_is_reported(tmp_path,monkeypatch):
 def test_explicit_input_rebind_preserves_old_plan_and_executes_new_data(tmp_path):
     s,root,opts,ref=setup(tmp_path)
     old=api().load(s,ref)
-    (root/'input.txt').write_text('000.750')
+    _write_text(root/'input.txt','000.750')
     new=api().rebind_inputs(s,ref,2,environment=opts['environment'])
     assert new['plan_version']==2 and new['plan_hash']!=ref['plan_hash']
     assert api().load(s,ref)==old
     result=api().invoke(s,new,environment=opts['environment'])
     assert result['status']=='SUCCEEDED'
-    assert s.retrieve(result['steps'][0]['receipt'])['text']=='000.750\n'
+    assert s.retrieve(result['steps'][0]['receipt'])['text']==f'000.750{NATIVE_NEWLINE}'
 
 
 @pytest.mark.parametrize('name',['job.py','config.json','schema.json'])
 def test_input_rebind_refuses_changed_logic_dependencies(tmp_path,name):
     s,root,opts,ref=setup(tmp_path)
-    (root/name).write_text('changed')
+    _write_text(root/name,'changed')
     with pytest.raises(ValueError):api().rebind_inputs(s,ref,2,environment=opts['environment'])
     with api().database(s) as db:
         assert db.execute('SELECT count(*) FROM plans').fetchone()[0]==1
@@ -263,7 +269,7 @@ def test_input_rebind_rechecks_logic_changed_during_registration(tmp_path,monkey
     original=dep.read_file
     def change_logic(path,metrics):
         result=original(path,metrics)
-        if path==root/'input.txt':(root/'job.py').write_text('print("different logic")')
+        if path==root/'input.txt':_write_text(root/'job.py','print("different logic")')
         return result
     monkeypatch.setattr(dep,'read_file',change_logic)
     with pytest.raises(ValueError):api().rebind_inputs(s,ref,2,environment=opts['environment'])

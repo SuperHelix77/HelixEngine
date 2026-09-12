@@ -88,7 +88,8 @@ def test_http_switch_controls_new_runs_without_rerun(tmp_path, monkeypatch):
         state = request()[1]
         row = state['runs'][0]
         assert row['enabled'] is True and row['exit_code'] == 7
-        assert row['stdout_bytes'] == 50001 and row['visible_bytes'] < row['stdout_bytes']
+        expected_size = len((('line' + os.linesep) * 10000 + os.linesep).encode())
+        assert row['stdout_bytes'] == expected_size and row['visible_bytes'] < row['stdout_bytes']
         assert len(state['runs']) == 2
     finally:
         server.terminate()

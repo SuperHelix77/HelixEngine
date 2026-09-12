@@ -47,6 +47,20 @@ assertions and regression bodies were preserved; the per-file assertion and
 Excluded tests/modules: none. No platform-specific original test required a
 skip, and the requested source set contained no absent research-only module.
 
+## Windows portability adjustments
+
+- Child text-mode output assertions use `os.linesep`; fixtures that bind raw
+  bytes retain their explicit byte sequences.
+- Timeout tests require a timed-out nonzero termination status, covering both
+  POSIX negative signals and Windows positive process termination codes.
+- The Unicode separator fixture writes UTF-8 bytes through
+  `stdout.buffer`, so the test exercises the intended bytes rather than the
+  Windows console encoding.
+- The oversized line cases use compact parameter IDs, keeping
+  `PYTEST_CURRENT_TEST` below Windows' environment-variable limit.
+- Named-plan fixture and mutation files use explicit UTF-8 encoding. Runtime
+  dependency identity behavior remains covered by the original assertions.
+
 ## Verification
 
 Run from `HelixEngine/` with the supplied virtual environment:
@@ -56,7 +70,7 @@ Run from `HelixEngine/` with the supplied virtual environment:
   PASS
 
 .venv/bin/python -m pytest -q tests/legacy
-136 passed in 2.36s
+136 passed in 2.59s
 ```
 
 The green run collected and passed all 136 tests. It uses only local
@@ -66,6 +80,6 @@ provenance validation, atomic publication, stale-state rejection, failure
 propagation, bounded retrieval, and recovery.
 
 Integration verification after backend changes: all 136 legacy tests pass
-within the 174-test application suite on macOS/Python 3.14. Cross-platform
+within the 176-test application suite on macOS/Python 3.14. Cross-platform
 qualification is tracked by the release CI jobs; this local result alone
 does not certify Windows or Linux behavior.

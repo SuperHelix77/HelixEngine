@@ -1,4 +1,4 @@
-import copy, sqlite3, sys
+import copy, os, sqlite3, sys
 import pytest
 from helixengine.core.evidence import Store, run
 from helixengine.core.verification import verify, publish
@@ -45,10 +45,11 @@ def test_explicit_omission_is_not_claimed_complete(tmp_path):
 def test_unicode_separator_uses_same_lines_as_exact_retrieval(tmp_path):
     store = Store(tmp_path/'store')
     text = 'note\u2028still same source line\nERROR exact=000.100'
-    candidate = run(store, [sys.executable, '-c', f'print({text!r})'], tmp_path, 'fixture')
+    raw = text.encode('utf-8') + os.linesep.encode()
+    candidate = run(store, [sys.executable, '-c', f'import sys;sys.stdout.buffer.write({raw!r})'], tmp_path, 'fixture')
     assert verify(store,candidate)['verified']
     assert candidate['streams']['stdout']['diagnostics'][0]['line']==2
-    assert store.retrieve(candidate['receipt'],start=2,end=2)['text']=='ERROR exact=000.100\n'
+    assert store.retrieve(candidate['receipt'],start=2,end=2)['text']==f'ERROR exact=000.100{os.linesep}'
 
 
 @pytest.mark.parametrize('field,value', [('exit_code',False),('exit_code',0.0),('timed_out',0),('interrupted',0)])

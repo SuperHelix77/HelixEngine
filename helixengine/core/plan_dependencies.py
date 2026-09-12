@@ -2,12 +2,20 @@
 import hashlib,os,stat,time
 from pathlib import Path
 
+WINDOWS = os.name == 'nt'
+
 
 def digest(data):return hashlib.sha256(data).hexdigest()
 
 
 def stamp(s):
-    return [s.st_dev,s.st_ino,s.st_size,s.st_mtime_ns,s.st_ctime_ns,stat.S_IMODE(s.st_mode)]
+    mode = stat.S_IMODE(s.st_mode)
+    # CPython's Windows path stat synthesizes execute bits from extensions;
+    # fd stat has no filename and does not. These are not ACL permissions.
+    # Retain file identity, size, times and read/write bits on both reads.
+    if WINDOWS:
+        mode &= ~0o111
+    return [s.st_dev,s.st_ino,s.st_size,s.st_mtime_ns,s.st_ctime_ns,mode]
 
 
 def local_path(root,name):

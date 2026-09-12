@@ -1,7 +1,9 @@
-import random
+import os,random
 import pytest
 from helixengine.core.evidence import Store
 from helixengine.core.line_index import build, retrieve
+
+NATIVE_NEWLINE=os.linesep
 
 
 def test_exact_ranges_across_nodes_and_binary_lines(tmp_path):
@@ -15,7 +17,7 @@ def test_exact_ranges_across_nodes_and_binary_lines(tmp_path):
     assert retrieve(s,index,source)[0] == raw
 
 
-@pytest.mark.parametrize('raw', [b'', b'a', b'a\r\nb\rc\n', b'x'*100000+b'\nlast'])
+@pytest.mark.parametrize('raw', [b'', b'a', b'a\r\nb\rc\n', b'x'*100000+b'\nlast'], ids=['empty','single-byte','mixed-newlines','oversized-line'])
 def test_empty_and_oversized_lines(tmp_path, raw):
     s = Store(tmp_path);source=s.put(raw)['sha256'];index=build(s,source,chunk_bytes=256)
     assert retrieve(s,index,source)[0] == raw
@@ -52,5 +54,5 @@ def test_receipt_retrieval_binds_index_to_correct_stream(tmp_path):
     from helixengine.core.evidence import run
     s=Store(tmp_path/'s');p=run(s,[sys.executable,'-c','print("first\\nsecond\\nthird")'],tmp_path,'test')
     index=build(s,p['raw']['stdout']['sha256'])
-    assert s.retrieve(p['receipt'],start=2,end=2,index=index)['text']=='second\n'
+    assert s.retrieve(p['receipt'],start=2,end=2,index=index)['text']==f'second{NATIVE_NEWLINE}'
     with pytest.raises(ValueError):s.retrieve(p['receipt'],stream='stderr',index=index)
