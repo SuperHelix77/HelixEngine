@@ -26,6 +26,11 @@ cannot produce a successful capture receipt. The original native submission
 continues; incomplete capture must not qualify that event for future inference
 suppression. With Engine OFF, no prompt evidence is captured.
 
+If this thread previously used the recording gate, the shared adapter can still
+attach a trusted exact-history locator on native re-entry, including while OFF.
+This is recovery of previously omitted observations, not additional capture or
+automatic summarization. See the recording gate's recovery limits and costs.
+
 Exact retrieval uses the ordinary Memory record hash and project scope. It
 does not depend on the model thread remaining alive. Records are local and
 may contain sensitive user text; the configured data directory is part of the

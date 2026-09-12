@@ -31,6 +31,45 @@ Activation requires an explicitly selected completed semantic-turn checkpoint. N
 
 **UNKNOWN:** live desktop notification acknowledgement, hosted-model normal-answer parity, complete-workflow economics and seven-cell model medians. No live grant was enabled. These remain release gates.
 
+## Recovery discoverability follow-up
+
+The original exact-recovery check was performed by the research caller. It did
+not establish that the next native model request knew where the omitted history
+was stored. The shared adapter now supplies a fixed history locator on semantic
+re-entry, also after OFF/deactivation. Historical payload never becomes developer
+instructions. Corrupt recovery metadata produces an explicit gap notice.
+
+**OBSERVED:** `appserver-transition-reentry` used a newly built and installed wheel,
+the same auth-free native app-server boundary, and five turns with request counts
+`[1, 0, 0, 1, 1]`. The locator appeared in both subsequent semantic requests.
+It contained neither the hidden Unicode marker nor the instruction-like payload.
+Executing its advertised argv recovered that marker exactly through the installed
+CLI. The first locator was **897 UTF-8 bytes**. This is additional context with
+retrieval costs; it is not free and does not prove appropriate real-model use.
+
+The mock endpoint emitted a fixed response and performed no semantic evaluation.
+**UNKNOWN:** whether a hosted model retrieves all necessary evidence and preserves
+normal-answer capability. The next smallest qualification is a preregistered late
+relevance/recovery pilot, not another claim based only on available cold bytes.
+
+- Re-entry probe: `173b64775a51b690d9f075777f71917f4e5d2cde7a33127fe2b94a7e40e9bb33`
+- Re-entry result: `302023df9d28456867b56b1e3f5574ce97ced2b5124a3dc6188db99e85a48201`
+- Re-entry wheel: `23e858c5206ad397312787e3dd95b8abeb13827f34a3cf52de3e1fce478cf72c`
+
+An independent review then found that plain `python -m helixengine` could resolve
+a project-local shadow module. The advertised recovery command now uses isolated
+Python and the hook's absolute trusted package root. A fresh installed-wheel
+probe from a hostile working directory with both a shadow `helixengine.py` and
+hostile `PYTHONPATH` passed exact recovery without executing the shadow module.
+The request sequence remained `[1, 0, 0, 1, 1]`; the hardened locator measured
+**1,091 bytes**. The earlier 897-byte result remains historical, not the current
+locator cost. The fixed bootstrap is caller-owned mechanics; the model does not
+need to regenerate recovery code.
+
+- Isolated probe: `dd99221f0f255521705ecf99ce6287513a7fa022f8094ffbabb5ec277dda7ad0`
+- Isolated result: `0c223acf6d66aaee21ad7d74617e8d372cb2d3a3783f66fc25b9f76b24a85a88`
+- Isolated wheel: `ed50cc81976ff5af66165231b313b0ba6278db78dbbe93344db37058dfc8052e`
+
 ## Evidence identities
 
 - `appserver_transition_installed.py`: `e2de36b318ff257c4796326b5d2e71f7f884e39bdce73490459b47d4798c9745`

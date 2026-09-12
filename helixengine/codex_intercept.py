@@ -119,12 +119,27 @@ def _deactivate_recording(data_dir, thread_id):
         pass
 
 
+def _recording_context(data_dir, thread_id):
+    try:
+        from helixengine.native_transitions import reentry_context
+        return reentry_context(data_dir, thread_id)
+    except Exception:
+        # Never block a semantic request or inject corrupt archived metadata.
+        return {'hookSpecificOutput': {'hookEventName': 'UserPromptSubmit',
+                'additionalContext': 'Helix exact-history recovery index is unavailable. '
+                'Previously recorded observations may be absent from this transcript. '
+                'Do not assume history is complete; resolve the recovery gap before '
+                'a decision that depends on earlier observations.'}}
+
+
 def hook(event, data_dir, session_scope=None):
     from helixengine.state import State
     started = time.perf_counter()
     if not isinstance(event, dict) or not _identity(event.get('session_id')):
         return {}
     if session_scope is not None and event['session_id'] != session_scope:
+        return {}
+    if event.get('agent_id') is not None and not _identity(event['agent_id']):
         return {}
     state = State(data_dir)
     kind = event.get('hook_event_name')
@@ -134,7 +149,7 @@ def hook(event, data_dir, session_scope=None):
     if kind == 'UserPromptSubmit':
         if not state.settings()['enabled']:
             _deactivate_recording(data_dir, binding['thread_id'])
-            return {}
+            return _recording_context(data_dir, binding['thread_id'])
         # The caller's native cwd supplies logical memory scope. This is not an
         # access-control boundary or a claim that historical text is authority.
         try:
@@ -144,7 +159,7 @@ def hook(event, data_dir, session_scope=None):
                 state.event('CODEX_PROMPT_CAPTURE_INCOMPLETE',
                             {**binding, 'error_type': 'invalid_cwd',
                              'hook_seconds': time.perf_counter() - started})
-                return {}
+                return _recording_context(data_dir, binding['thread_id'])
             from helixengine.core.evidence import Store
             from helixengine.core.workflow_memory import Memory
             from helixengine.prompt_memory import capture_prompt
@@ -153,17 +168,18 @@ def hook(event, data_dir, session_scope=None):
             state.event('CODEX_PROMPT_CAPTURED' if result.get('captured') else 'CODEX_PROMPT_CAPTURE_INCOMPLETE',
                         {**binding, 'capture': result, 'hook_seconds': time.perf_counter() - started})
             from helixengine.native_transitions import dispatch
-            return dispatch(data_dir, memory, result, native_event=event)
+            response = dispatch(data_dir, memory, result, native_event=event)
+            return response or _recording_context(data_dir, binding['thread_id'])
         except Exception as exc:
             _deactivate_recording(data_dir, binding['thread_id'])
             # Original submission remains native even if capture/publication
-            # fails. Never return context, a block, or a synthetic model answer.
+            # fails. Recovery navigation may still be needed for prior records.
             try:
                 state.event('CODEX_PROMPT_CAPTURE_INCOMPLETE',
                             {**binding, 'error_type': type(exc).__name__})
             except Exception:
                 pass
-        return {}
+        return _recording_context(data_dir, binding['thread_id'])
     if kind in ('SubagentStart', 'SubagentStop'):
         state.event('CODEX_' + kind.upper(), binding)
         return {}
