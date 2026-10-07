@@ -41,7 +41,55 @@ helix --handle -p "..."            # answers as @N handles of exact tool output 
 Inside a session the model has: `hstep need "objective" callers:NAME tests:NAME coverage:FILE ...` (one call = one typed investigation packet), `outline`, `sym`, `callers`, `inv`, `ed`/`ins`/`rep`, `raw N A-B` (exact recovery of anything that was compressed), `hmem q "terms"` (memory), and optionally `ask`/`summ`/`docgen`.
 Goal graphs: `helix preflight "goal"` (one frontier call -> validated GoalGraph) and `helix graph run G.json`.
 
-## 5. Apply Helix to your normal Claude Code (optional, explicit, reversible)
+## 5. Install into Grok Build (optional, leaves Claude alone)
+Grok and Claude do not share an engine. Clone or keep this tree wherever you like (the checked-out copy at `~/.grok/helix-engine` is the usual place) and install the Grok host only:
+
+```sh
+./install.sh --grok
+```
+
+That does four things and does not edit `~/.claude/settings.json` or replace `~/.local/bin/helix`:
+
+| Step | Result |
+|---|---|
+| Link | `~/.local/bin/helix-grok` -> this tree's `helix` |
+| Hooks | `~/.grok/hooks/helix.json` (SessionStart, PreToolUse, PreCompact, Stop, SessionEnd) |
+| Skill | `~/.grok/skills/helix/SKILL.md`, with this tree's path filled in |
+| Memory | `memory.db` in this tree. The adapter sets `HELIX_HOME` and `HELIX_MEM_DB` itself |
+
+`install.sh --grok` still generates `settings.json` and can take `--prefix`, `--no-link`, `--skip-checks`, `--with-local-models`, and `--with-laya`. Without `claude` on `PATH` it warns instead of stopping: hooks and `hstep` do not need the Claude CLI. The interactive `helix-grok` session does.
+
+Preview or redo one piece:
+
+```sh
+helix grok hooks print
+helix grok hooks install          # writes ~/.grok/hooks/helix.json; backup beside it; refuses a foreign file
+helix grok hooks uninstall
+helix grok skill install          # writes ~/.grok/skills/helix/SKILL.md
+helix grok install                # hooks and skill
+```
+
+`--hooks FILE` and `--skill FILE` write somewhere else. Grok reads hooks when the process starts. After installing, open a new Grok session, or run `/hooks` and press `r`.
+
+Use it from a project:
+
+```sh
+HELIX_HOME=$HOME/.grok/helix-engine helix-grok doctor
+HELIX_HOME=$HOME/.grok/helix-engine $HELIX_HOME/bin/hstep need "who calls parse" callers:parse tests:parse
+HELIX_HOME=$HOME/.grok/helix-engine $HELIX_HOME/bin/hmem q "terms"
+```
+
+### Fixes this install includes
+Grok is not Claude Code with a different name. These are the host differences the adapter and the hook file account for:
+
+- **Unset `$VAR` fails the hook before it runs.** Grok scans the whole hook command for `$NAME` and `${NAME}` and, if that variable is unset, records `hook not executed: required env var(s) not set` and does not spawn the command. POSIX forms such as `${NAME:-}` and `${NAME%pat}` are left for the shell. A script-local name such as `$_G` is enough to fail every event in 0ms. The Grok hook commands are absolute paths (`/usr/bin/python3` plus `adapters/grok.py`) and contain no `$`.
+- **Tool names differ.** Grok's shell, read, edit, and search tools are `run_terminal_command`, `read_file`, `search_replace`, and `grep`. `adapters/grok.py` maps those to `Bash`, `Read`, `Edit`, and `Grep` before the Claude adapter sees the event. The PreToolUse matcher stays `Bash`, which is the name Grok already matches against `run_terminal_command`.
+- **Transcripts differ.** Grok stores `chat_history.jsonl` (`type` of `user`, `assistant`, `tool_result`), not Claude's `message` envelope. On Stop, PreCompact, and SessionEnd the adapter rewrites a copy under `run/grok-transcripts/` and points memory consolidation at that copy. User text is the `<user_query>` body, so the system reminder is not archived as the user turn.
+- **A new Grok session starts with source `startup`.** The SessionStart matcher is `startup|resume|clear|compact`. The Claude snippet only matches `resume|clear|compact`, which would skip capsule restore on a fresh Grok session.
+- **A hook error must not stop the turn.** The adapter catches its own failures, writes them to stderr, and exits 0. Grok still records a non-zero hook as a failure in the scrollback even though the turn continues.
+- **Memory stays in this tree.** `HELIX_FOR_GROK=1` and `HELIX_MEM_DB` point at this install's `memory.db`. Do not point them at `~/.claude-lean/memory.db`.
+
+## 6. Apply Helix to your normal Claude Code (optional, explicit, reversible)
 Nothing above changes your default `claude`. To add rtk rewriting, capsule restore at session start (resume/clear/compact), and memory consolidation at PreCompact/Stop to **your** `~/.claude/settings.json`:
 ```sh
 helix hooks print                  # see exactly what would be merged (writes nothing)
@@ -50,21 +98,22 @@ helix hooks uninstall              # removes only Helix's entries (another backu
 ```
 `helix hooks install --settings /path/to/settings.json` targets a different file (e.g. a project's `.claude/settings.json`).
 
-## 6. Optional: local models
+## 7. Optional: local models
 ```sh
 ./install.sh --with-local-models   # or: helix lm-up && OLLAMA_HOST=127.0.0.1:11500 ollama pull qwen3:1.7b
 helix lm-down                      # stops only the private server on :11500
 ```
 The local model writes docstrings (`docgen --verify` rejects hallucinated identifiers), answers narrow questions (`ask`), and summarizes (`summ`). Its answers are not checked by Claude; the docstrings were ~20% wrong in our evaluation, so review them.
 
-## 7. Optional: Laya experiments
+## 8. Optional: Laya experiments
 `./install.sh --with-laya`, then see `laya/` (data generators, evaluators, training wrapper with MPS cache release, int8 helper). Experimental; nothing in the core requires it.
 
-## 8. Reproduce the benchmarks
+## 9. Reproduce the benchmarks
 See `bench/README.md` (regenerate the report from included raw results with no API calls, or re-run the campaign on your own plan).
 
 ## Troubleshooting
-- `helix: command not found` -> add `~/.local/bin` to PATH (see step 2).
+- `helix: command not found` -> add `~/.local/bin` to PATH (see step 2). A Grok install links `helix-grok`, not `helix`.
+- Grok shows `hook not executed: required env var(s) not set` -> the hook command contains an unset `$NAME`. Reinstall with `helix grok hooks install` and start a new session. Helix's own command has no `$`.
 - `claude: command not found` / not logged in -> install and run `claude` once.
 - `You've hit your session limit` in benchmark runs -> your plan's usage limit; the runner stops and records nothing; wait for the reset.
 - `rtk rewrite` seems to do nothing -> rtk exits with code 3 when it rewrites; Helix accepts 0 and 3. Check `rtk rewrite "git status"`.
@@ -73,4 +122,4 @@ See `bench/README.md` (regenerate the report from included raw results with no A
 - Python < 3.9 -> install a newer Python and set `HELIX_PYTHON=/path/to/python3`.
 
 ## Uninstall
-`./uninstall.sh` (removes the link), `helix hooks uninstall` (if you installed hooks), then `rm -rf ~/helix-engine` (this also deletes your local `memory.db`).
+`./uninstall.sh` (removes the `helix` link), `helix hooks uninstall` (Claude hooks), `helix grok hooks uninstall` and delete `~/.grok/skills/helix/SKILL.md` (Grok), then `rm -rf` the clone (this also deletes that tree's `memory.db`). `uninstall.sh` does not remove a `helix-grok` link; delete that symlink yourself if you created one.

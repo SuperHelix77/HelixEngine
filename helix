@@ -3,6 +3,7 @@
 #   helix [--terse ultra|full|lite|off] [--handle] [claude args...]
 #   helix doctor [--live] | helix prompt | helix version | helix lm-up | helix lm-down
 #   helix preflight "goal" | helix graph run G.json [--root D] | helix hooks (prints settings snippet; never writes) | helix consolidate TRANSCRIPT SESSION
+#   helix grok install | helix grok hooks [print|install|uninstall] | helix grok skill [print|install]
 H=${HELIX_HOME:-${0:A:h}}; export HELIX_HOME=$H
 PY=${HELIX_PYTHON:-$(command -v python3)}; [ -x /usr/bin/python3 ] && [ -z "$HELIX_PYTHON" ] && PY=/usr/bin/python3
 case "$1" in
@@ -12,6 +13,7 @@ case "$1" in
   preflight) shift; exec $PY $H/adapters/standalone.py preflight "$@";;
   graph) shift; exec $PY $H/adapters/standalone.py "$@";;
   hooks) shift; exec $PY $H/adapters/claude_code.py hooks "$@";;
+  grok) shift; exec $PY $H/adapters/grok.py "$@";;
   consolidate) shift; exec python3 -c "import sys,os;sys.path.insert(0,'$H/lib');import consolidate,json;print(json.dumps(consolidate.consolidate(sys.argv[1],sys.argv[2],db=os.environ.get('HELIX_MEM_DB',os.path.join('$H','memory.db')),root='.')))" "$@";;
   lm-up) exec $H/lmup.sh;;
   lm-down) exec $H/lmdown.sh;;

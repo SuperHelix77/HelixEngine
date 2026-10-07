@@ -166,6 +166,32 @@ class TestHookInstall(unittest.TestCase):
         cmds=[h['command'] for g in s2['hooks']['PreToolUse'] for h in g['hooks']]; self.assertIn('/usr/local/bin/mine',cmds); self.assertTrue(any('claude_code.py PreToolUse' in c for c in cmds))
         self.assertTrue(any(f.startswith('settings.json.bak-helix-') for f in os.listdir(d)))                                                  # backup made
         self.assertEqual(self.run_ad('uninstall','--settings',p).returncode,0); s3=json.load(open(p)); self.assertEqual(s3,orig)            # exact restore
+    def test_grok_hooks_have_no_env_refs_and_roundtrip(self):
+        import importlib.util
+        spec=importlib.util.spec_from_file_location('helix_grok_adapter',H+'/adapters/grok.py')
+        mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        d=tempfile.mkdtemp(); self.addCleanup(shutil.rmtree,d,True)
+        hooks=d+'/helix.json'; skill=d+'/SKILL.md'
+        r=subprocess.run([sys.executable,H+'/adapters/grok.py','install','--hooks',hooks,'--skill',skill],capture_output=True,text=True)
+        self.assertEqual(r.returncode,0,r.stderr)
+        text=open(hooks).read(); self.assertNotIn('$',text)
+        payload=json.loads(text)
+        self.assertIn('startup|resume|clear|compact',payload['hooks']['SessionStart'][0]['matcher'])
+        cmd=payload['hooks']['PreToolUse'][0]['hooks'][0]['command']
+        self.assertIn('adapters/grok.py PreToolUse',cmd); self.assertTrue(cmd.startswith('/'))
+        self.assertEqual(subprocess.run([sys.executable,H+'/adapters/grok.py','install','--hooks',hooks,'--skill',skill],capture_output=True).returncode,0)
+        self.assertFalse(any(name.startswith('helix.json.bak-helix-') for name in os.listdir(d)))
+        self.assertIn(H,open(skill).read()); self.assertNotIn('__HELIX_HOME__',open(skill).read())
+        src=d+'/chat_history.jsonl'
+        open(src,'w').write(json.dumps({'type':'user','content':'<user_query>who calls parse</user_query>'})+'\n')
+        mod.HOME=d
+        event=mod.normalize({'cwd':d,'toolName':'run_terminal_command','toolInput':{'command':'echo hi'},'transcriptPath':src})
+        self.assertEqual(event['tool_name'],'Bash'); self.assertEqual(event['tool_input'],{'command':'echo hi'})
+        saved=json.loads(open(event['transcript_path']).readline())
+        self.assertEqual(saved['message']['content'],'who calls parse')
+        open(hooks,'w').write('{"hooks":{"Stop":[{"hooks":[{"command":"echo foreign"}]}]}}\n')
+        refused=subprocess.run([sys.executable,H+'/adapters/grok.py','hooks','install','--hooks',hooks],capture_output=True,text=True)
+        self.assertNotEqual(refused.returncode,0); self.assertIn('foreign',open(hooks).read())
     def test_print_does_not_write(self):
         d=tempfile.mkdtemp(); self.addCleanup(shutil.rmtree,d,True); p=d+'/s.json'
         r=self.run_ad('print','--settings',p); self.assertEqual(r.returncode,0); self.assertFalse(os.path.exists(p)); self.assertIn('SessionStart',json.loads(r.stdout))

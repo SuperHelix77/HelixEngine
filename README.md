@@ -14,7 +14,7 @@ A local semantic execution runtime for coding agents, built around one idea: **f
 | Core protocol | GoalGraph / GoalStep / ExecutionEnvelope / EvidencePacket / ClaimProposal / DecisionReceipt; deterministic controller that escalates instead of guessing | `PROTOCOL.md`, `lib/hcore.py` |
 | Memory | lossless SQLite+FTS5 archive, passage retrieval, capsule restore, claim ledger (STALE on dependency change, SUPERSEDED) | `lib/hmem.py`, `lib/claims.py`, `bin/hmem` |
 | Autonomy | frontier preflight -> GoalGraph, single-agent scheduler, EV-based escalation ladder with micro-escalation and de-escalation, pre-tool interception under equivalence contracts | `lib/preflight.py`, `scheduler.py`, `escalate.py`, `intercept.py` |
-| Host adapters | Claude Code hook adapter (opt-in, reversible), standalone reference adapter | `adapters/` |
+| Host adapters | Claude Code hook adapter and a Grok Build adapter (both opt-in, reversible), standalone reference adapter | `adapters/` |
 | Local models (optional) | private Ollama on a separate port for `ask`/`summ`/`docgen` (verified docstrings); optional Laya decision-model experiments | `bin/`, `laya/` |
 
 Multi-agent scheduling is intentionally not implemented in this version.
@@ -25,8 +25,9 @@ git clone https://github.com/SuperHelix77/HelixEngine.git ~/helix-engine
 cd ~/helix-engine && ./install.sh        # checks prerequisites, generates settings, links `helix`
 helix doctor                              # verify
 helix                                     # start a lean Helix session
+./install.sh --grok                       # optional: Grok hooks + helix-grok, leaves `helix` alone
 ```
-Full instructions, prerequisites, optional components and troubleshooting: **[INSTALL.md](INSTALL.md)**.
+Full instructions, prerequisites, the Grok install, optional components and troubleshooting: **[INSTALL.md](INSTALL.md)**.
 
 ## Measured results
 Final Helix Core (Laya not involved), 60 code-investigation tasks over 4 repos (HelixEngine v0.1.0, HelixContext, click, requests), default Claude Code as baseline, blind-judged correctness, bootstrap CIs over tasks. Full tables, per-family and per-repo breakdowns: [`bench/TOKEN_METRICS.md`](bench/TOKEN_METRICS.md); raw runs and a no-API report regenerator: [`bench/`](bench/README.md).
