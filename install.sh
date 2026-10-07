@@ -21,7 +21,7 @@ c=sqlite3.connect(':memory:'); c.execute('create virtual table t using fts5(a)')
 PY
   ok "python3 $(python3 -c 'import sys;print("%d.%d"%sys.version_info[:2])') with sqlite FTS5"
   if [ "$GROK" = 1 ]; then
-    command -v claude >/dev/null && ok "claude CLI ($(claude --version 2>/dev/null | head -1))" || warn "claude CLI not found. Fine for Grok hooks and hstep; the interactive 'helix-grok' session still needs it"
+    command -v grok >/dev/null && ok "grok CLI ($(grok --version 2>/dev/null | head -1))" || warn "Grok CLI missing. Hooks/hstep can install, but 'helix-grok' needs Grok Build from https://x.ai/cli"
   else
     command -v claude >/dev/null && ok "claude CLI ($(claude --version 2>/dev/null | head -1))" || die "Claude Code CLI not found. Install it first: https://docs.claude.com/en/docs/claude-code and run 'claude' once to log in"
   fi
@@ -57,7 +57,8 @@ fi
 echo; echo "Done. Next:"
 if [ "$GROK" = 1 ]; then
   echo "  HELIX_HOME=$HERE helix-grok doctor"
-  echo "  helix grok hooks print     # the file written to ~/.grok/hooks/helix.json"
+  echo "  helix-grok hooks print    # the file written to ~/.grok/hooks/helix.json"
+  echo "  helix-grok                # starts Grok Build, not Claude Code"
 else
   echo "  helix doctor          # verify the install"; echo "  helix                 # start a lean Helix session"; echo "  helix hooks print     # see what 'helix hooks install' would add to ~/.claude/settings.json"
 fi

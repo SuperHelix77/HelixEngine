@@ -3,7 +3,7 @@ turn raw material into handles, drop transient context. Native lossy summarizati
 hot  = still needed verbatim next turn (recent window, user directives, unresolved errors)   -> stays in the capsule/context
 warm = durable conclusions (assistant decisions/results, claims)                              -> claim ledger + hot index
 cold = raw tool I/O                                                                          -> lossless archive, addressable by #seq handle only"""
-import os,sys,re,json
+import os,sys,re,json,hashlib
 sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)))
 import hmem,capsule
 try: import claims as hclaims
@@ -17,12 +17,23 @@ def classify(units,window=12):
         elif u['kind']=='assistant' and (capsule.CUE_DEC.search(u['text']) or capsule.CUE_FACT.search(u['text'])): warm.append(u['seq'])
         else: cold.append(u['seq'])
     return {'hot':hot,'warm':warm,'cold':cold}
+def _source_watermark_scope(project, transcript):
+    """A new agent session restarts its unit sequence at zero.
+
+    Preserve the project as the memory retrieval scope, but track incremental
+    ingestion separately for each stable transcript path.
+    """
+    source = os.path.realpath(os.path.abspath(transcript))
+    digest = hashlib.sha256(source.encode('utf-8')).hexdigest()[:24]
+    return f'{project}:transcript:{digest}'
+
 def consolidate(transcript,session,db=None,root='.',budget_tokens=1200,out_dir=None):
     """incremental: only units newer than the stored watermark are ingested; returns stats and writes capsule.<session>.txt"""
     db=db or hmem.DB; units=hmem.units_from_transcript(transcript)
-    done=int(hmem.meta_get(session,'last_seq',-1,db)); new=[u for u in units if u['seq']>done]
+    scope=_source_watermark_scope(session,transcript)
+    done=int(hmem.meta_get(scope,'last_seq',-1,db)); new=[u for u in units if u['seq']>done]
     n=hmem.ingest(new,session=session,path=db) if new else 0
-    if units: hmem.meta_set(session,'last_seq',units[-1]['seq'],db)
+    if units: hmem.meta_set(scope,'last_seq',units[-1]['seq'],db)
     cl=hclaims.all_claims(root,db,session=None) if hclaims else []
     cap=capsule.build_map(units,claim_list=cl,claim_cap=18) if units else ''
     # budget: trim claim hot index first (claims are retrievable), then phases

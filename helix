@@ -6,6 +6,20 @@
 #   helix grok install | helix grok hooks [print|install|uninstall] | helix grok skill [print|install]
 H=${HELIX_HOME:-${0:A:h}}; export HELIX_HOME=$H
 PY=${HELIX_PYTHON:-$(command -v python3)}; [ -x /usr/bin/python3 ] && [ -z "$HELIX_PYTHON" ] && PY=/usr/bin/python3
+# Invoked via the Grok symlink: Grok CLI, not the Claude CLI below.
+if [[ "$0" == */helix-grok || "$0" == helix-grok ]]; then
+  export HELIX_FOR_GROK=1
+  case "$1" in
+    doctor|version|preflight|graph|consolidate|grok|lm-up|lm-down|prompt) ;;
+    hooks) shift; exec $PY "$H/adapters/grok.py" hooks "$@";;
+    *)
+      if ! command -v grok >/dev/null 2>&1; then
+        print -u2 "Grok Build CLI missing; install from https://x.ai/cli"
+        exit 127
+      fi
+      exec grok "$@" ;;
+  esac
+fi
 case "$1" in
   doctor) shift; exec $PY $H/helix_doctor.py "$@";;
   prompt) shift; exec $PY $H/compose.py "$@";;

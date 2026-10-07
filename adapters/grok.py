@@ -6,13 +6,13 @@ event into the Claude Code shape and hands it to adapters/claude_code.py with
 HELIX_HOME pointed at this install. Claude Code's copy is a different directory
 and a different memory.db.
 """
-import json, os, re, sys, subprocess
+import json, os, re, sys, subprocess, hashlib
 from urllib.parse import quote
 
 HOME = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.environ['HELIX_HOME'] = HOME
 os.environ['HELIX_FOR_GROK'] = '1'
-os.environ.setdefault('HELIX_MEM_DB', os.path.join(HOME, 'memory.db'))
+os.environ['HELIX_MEM_DB'] = os.environ.get('HELIX_GROK_MEM_DB') or os.path.join(HOME, 'memory.db')
 
 TOOL_ALIAS = {
     'run_terminal_command': 'Bash',
@@ -21,6 +21,56 @@ TOOL_ALIAS = {
     'grep': 'Grep',
 }
 USER_QUERY = re.compile(r'<user_query>\s*(.*?)\s*</user_query>', re.S)
+
+
+def _project_key(cwd):
+    """Match the project key in the Claude adapter, without sharing its DB."""
+    return 'p-' + hashlib.sha256(os.path.abspath(cwd).encode()).hexdigest()[:10]
+
+
+def _delivery_marker(event):
+    session = event.get('sessionId') or event.get('session_id') or os.environ.get('GROK_SESSION_ID')
+    if not session:
+        return ''
+    cwd = os.path.abspath(event.get('cwd') or event.get('workspaceRoot') or os.getcwd())
+    digest = hashlib.sha256((str(session) + '|' + cwd).encode()).hexdigest()[:32]
+    return os.path.join(HOME, 'run', 'grok-delivery', digest)
+
+
+def _reset_capsule_delivery(event):
+    marker = _delivery_marker(event)
+    if marker:
+        try:
+            os.unlink(marker)
+        except FileNotFoundError:
+            pass
+
+
+def _capsule_for_first_tool(event):
+    """Grok ignores SessionStart stdout; deliver once after the first Bash tool.
+
+    This cannot precede Grok's first inference. For early recall, ask hmem
+    explicitly. Atomic marker creation prevents concurrent double injection.
+    """
+    marker = _delivery_marker(event)
+    if not marker or os.path.exists(marker):
+        return ''
+    sys.path.insert(0, os.path.join(HOME, 'lib'))
+    import consolidate
+    cwd = event.get('cwd') or os.getcwd()
+    capsule = consolidate.session_start_context(
+        _project_key(cwd), db=os.environ['HELIX_MEM_DB']
+    )
+    if not capsule:
+        return ''
+    os.makedirs(os.path.dirname(marker), exist_ok=True)
+    try:
+        fd = os.open(marker, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        return ''
+    with os.fdopen(fd, 'w') as handle:
+        handle.write('delivered\n')
+    return 'HELIX MEMORY (addressable; use hmem q / hmem raw for exact evidence):\n' + capsule
 
 
 def _load():
@@ -124,7 +174,7 @@ def _looks_like_grok(path):
     return row.get('type') in ('system', 'user', 'assistant', 'tool_result', 'reasoning') and 'message' not in row
 
 
-def normalize(event):
+def normalize(event, event_name=''):
     cwd = event.get('cwd') or event.get('workspaceRoot') or os.getcwd()
     event['cwd'] = cwd
     name = event.get('tool_name') or event.get('toolName') or ''
@@ -136,6 +186,9 @@ def normalize(event):
         event['tool_input'] = {'command': tool_input.get('command') or ''}
     elif isinstance(tool_input, dict):
         event['tool_input'] = tool_input
+    # Do not reprocess a growing full transcript on every tool call.
+    if event_name and event_name not in ('Stop', 'PreCompact', 'SessionEnd'):
+        return event
     src = _find_transcript(event)
     if src and _looks_like_grok(src):
         session = event.get('sessionId') or event.get('session_id') or 'session'
@@ -288,15 +341,39 @@ def main():
         print('hooks installed into', hooks)
         print('skill installed into', skill)
         return 0
-    event = normalize(_load())
+    event_name = argv[0] if argv else ''
+    event = normalize(_load(), event_name=event_name)
+    if event_name == 'SessionStart':
+        # Passive SessionStart stdout is ignored by Grok.
+        _reset_capsule_delivery(event)
+        return 0
     proc = subprocess.run(
         [sys.executable, os.path.join(HOME, 'adapters', 'claude_code.py'), *sys.argv[1:]],
         input=json.dumps(event).encode(),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-    if proc.stdout:
-        sys.stdout.buffer.write(proc.stdout)
+    output = proc.stdout
+    if event_name == 'PreToolUse' and proc.returncode == 0:
+        try:
+            capsule = _capsule_for_first_tool(event)
+            if capsule:
+                try:
+                    payload = json.loads(output) if output.strip() else {}
+                except (TypeError, ValueError):
+                    payload = {}
+                if not isinstance(payload, dict):
+                    payload = {}
+                hook = payload.setdefault('hookSpecificOutput', {})
+                hook['hookEventName'] = 'PreToolUse'
+                old = hook.get('additionalContext') or ''
+                hook['additionalContext'] = (old + '\n' if old else '') + capsule
+                output = (json.dumps(payload) + '\n').encode()
+        except Exception as exc:
+            # Optional recall must not discard an otherwise successful rewrite.
+            sys.stderr.write(f'helix grok capsule: {type(exc).__name__}: {exc}\n')
+    if output:
+        sys.stdout.buffer.write(output)
     if proc.stderr:
         sys.stderr.buffer.write(proc.stderr)
     return proc.returncode
@@ -306,5 +383,7 @@ if __name__ == '__main__':
     try:
         sys.exit(main())
     except Exception as exc:
+        if len(sys.argv) > 1 and sys.argv[1] in ('hooks', 'skill', 'install'):
+            raise  # CLI installation failures must never report success.
         sys.stderr.write(f'helix grok adapter: {type(exc).__name__}: {exc}\n')
         sys.exit(0)

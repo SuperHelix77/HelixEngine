@@ -19,6 +19,8 @@ A local semantic execution runtime for coding agents, built around one idea: **f
 
 Multi-agent scheduling is intentionally not implemented in this version.
 
+**Grok Build users:** See [GROK.md](GROK.md) for installation, verification, privacy boundaries and known hook limits. Grok support is an adapter, not yet a native Grok orchestration runtime.
+
 ## Install (short)
 ```sh
 git clone https://github.com/SuperHelix77/HelixEngine.git ~/helix-engine
@@ -65,7 +67,7 @@ Install Helix into Grok Build without replacing the Claude `helix` command or ed
 ./install.sh --grok
 ```
 
-That links `helix-grok`, writes `~/.grok/hooks/helix.json` and `~/.grok/skills/helix/SKILL.md`, and keeps memory in this tree's `memory.db`. Grok reads hooks when the process starts, so open a new session or run `/hooks` and press `r`. Full steps are in [INSTALL.md](INSTALL.md).
+That links `helix-grok` (which starts the **Grok Build CLI**, not Claude), writes `~/.grok/hooks/helix.json` and `~/.grok/skills/helix/SKILL.md`, and keeps memory in this tree's `memory.db`. Grok reads hooks when the process starts, so open a new session or run `/hooks` and press `r`. Its passive SessionStart hook cannot inject stdout; HELIX delivers a prior capsule after the first eligible shell result or users can query memory explicitly. See [GROK.md](GROK.md).
 
 - `hook not executed: required env var(s) not set` means the hook command references an unset `$NAME`. Grok rejects the command before it runs. Helix writes absolute paths and no `$`. Run `helix grok hooks install`, then start a new session. A session that is already open keeps the old command until that reload.
 - `helix: command not found` after `--grok` is expected. That install links `helix-grok`, not `helix`.

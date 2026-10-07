@@ -192,6 +192,47 @@ class TestHookInstall(unittest.TestCase):
         open(hooks,'w').write('{"hooks":{"Stop":[{"hooks":[{"command":"echo foreign"}]}]}}\n')
         refused=subprocess.run([sys.executable,H+'/adapters/grok.py','hooks','install','--hooks',hooks],capture_output=True,text=True)
         self.assertNotEqual(refused.returncode,0); self.assertIn('foreign',open(hooks).read())
+    def test_grok_tool_hot_path_skips_transcript_conversion(self):
+        import importlib.util
+        spec=importlib.util.spec_from_file_location('helix_grok_hotpath',H+'/adapters/grok.py')
+        mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        d=tempfile.mkdtemp(); self.addCleanup(shutil.rmtree,d,True)
+        src=d+'/chat_history.jsonl'
+        open(src,'w').write(json.dumps({'type':'user','content':'<user_query>hello</user_query>'})+'\n')
+        event=mod.normalize({'cwd':d,'toolName':'run_terminal_command',
+            'toolInput':{'command':'ls'},'transcriptPath':src},event_name='PreToolUse')
+        self.assertNotIn('transcript_path',event)
+        self.assertFalse(os.path.exists(d+'/run/grok-transcripts'))
+
+    def test_grok_capsule_once_and_resets_at_session_start(self):
+        import importlib.util,unittest.mock
+        spec=importlib.util.spec_from_file_location('helix_grok_capsule',H+'/adapters/grok.py')
+        mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        d=tempfile.mkdtemp(); self.addCleanup(shutil.rmtree,d,True)
+        mod.HOME=d
+        event={'sessionId':'grok-session-1','cwd':d}
+        open(d+'/capsule.'+mod._project_key(d)+'.txt','w').write('C91 ACTIVE E7')
+        with unittest.mock.patch.dict(os.environ,{'HELIX_MEM_DB':d+'/memory.db'}):
+            self.assertIn('C91 ACTIVE',mod._capsule_for_first_tool(event))
+            self.assertEqual(mod._capsule_for_first_tool(event),'')
+            mod._reset_capsule_delivery(event)
+            self.assertIn('C91 ACTIVE',mod._capsule_for_first_tool(event))
+            other={'sessionId':'grok-session-2','cwd':d}
+            self.assertIn('C91 ACTIVE',mod._capsule_for_first_tool(other))
+
+    def test_grok_alias_never_launches_claude(self):
+        if not shutil.which('zsh'):
+            self.skipTest('zsh is required for the launcher')
+        d=tempfile.mkdtemp(); self.addCleanup(shutil.rmtree,d,True)
+        link=d+'/helix-grok'; os.symlink(H+'/helix',link)
+        fake=d+'/grok'
+        open(fake,'w').write('#!/bin/sh\nprintf "native-grok:%s\n" "$*"\n')
+        os.chmod(fake,0o755)
+        r=subprocess.run([link,'--version'],capture_output=True,text=True,
+            env={**os.environ,'HELIX_HOME':H,'PATH':d+os.pathsep+os.environ.get('PATH','')})
+        self.assertEqual(r.returncode,0,r.stderr)
+        self.assertIn('native-grok:--version',r.stdout)
+
     def test_print_does_not_write(self):
         d=tempfile.mkdtemp(); self.addCleanup(shutil.rmtree,d,True); p=d+'/s.json'
         r=self.run_ad('print','--settings',p); self.assertEqual(r.returncode,0); self.assertFalse(os.path.exists(p)); self.assertIn('SessionStart',json.loads(r.stdout))
@@ -477,6 +518,20 @@ class TestConsolidate(unittest.TestCase):
         self.assertIn('do not touch codex',open(r['capsule_path']).read())
         r2=hcons.consolidate(p,'s',db=db,root=d); self.assertEqual(r2['ingested'],0)                      # watermark: nothing re-ingested
         p=self.transcript(d,30); r3=hcons.consolidate(p,'s',db=db,root=d); self.assertEqual(r3['ingested'],30)  # only the 10 new turns (3 units each: text, call, result)
+    def test_new_transcript_in_same_project_does_not_inherit_old_watermark(self):
+        d=tempfile.mkdtemp(); self.addCleanup(shutil.rmtree,d,True)
+        db=d+'/m.db'; old=self.transcript(d,5); project='shared-project'
+        self.assertGreater(hcons.consolidate(old,project,db=db,root=d)['ingested'],1)
+        before=hmem.connect(db).execute("SELECT COUNT(*) AS n FROM unit WHERE session=?",
+            (project,)).fetchone()['n']
+        fresh=d+'/new-session.jsonl'
+        open(fresh,'w').write(json.dumps({'type':'user','message':{'content':'New session retained'}})+'\n')
+        self.assertEqual(hcons.consolidate(fresh,project,db=db,root=d)['ingested'],1)
+        self.assertEqual(hcons.consolidate(fresh,project,db=db,root=d)['ingested'],0)
+        after=hmem.connect(db).execute("SELECT COUNT(*) AS n FROM unit WHERE session=?",
+            (project,)).fetchone()['n']
+        self.assertEqual(after,before+1)
+
     def test_lossless_raw_survives_consolidation(self):
         d=tempfile.mkdtemp(); self.addCleanup(shutil.rmtree,d,True); db=d+'/m.db'; p=self.transcript(d,5); hcons.consolidate(p,'s',db=db,root=d)
         row=hmem.connect(db).execute("SELECT id FROM unit WHERE kind='result' ORDER BY seq LIMIT 1").fetchone(); self.assertIn('noise line',hmem.raw(row['id'],path=db))

@@ -1,0 +1,20 @@
+name: Helix Core and Grok adapter tests
+
+on:
+  push:
+    branches: [main, 'grok-*']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run stdlib unit tests (no model/API calls)
+        run: python -m unittest -v tests.test_engine
