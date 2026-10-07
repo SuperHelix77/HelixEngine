@@ -1,0 +1,36 @@
+#!/bin/zsh
+# Helix Engine launcher. Lean frontier session + local semantic runtime.
+#   helix [--terse ultra|full|lite|off] [--handle] [claude args...]
+#   helix doctor [--live] | helix prompt | helix version | helix lm-up | helix lm-down
+#   helix preflight "goal" | helix graph run G.json [--root D] | helix hooks (prints settings snippet; never writes) | helix consolidate TRANSCRIPT SESSION
+H=${HELIX_HOME:-${0:A:h}}; export HELIX_HOME=$H
+PY=${HELIX_PYTHON:-$(command -v python3)}; [ -x /usr/bin/python3 ] && [ -z "$HELIX_PYTHON" ] && PY=/usr/bin/python3
+case "$1" in
+  doctor) shift; exec $PY $H/helix_doctor.py "$@";;
+  prompt) shift; exec $PY $H/compose.py "$@";;
+  version) cat $H/VERSION; exit 0;;
+  preflight) shift; exec $PY $H/adapters/standalone.py preflight "$@";;
+  graph) shift; exec $PY $H/adapters/standalone.py "$@";;
+  hooks) shift; exec $PY $H/adapters/claude_code.py hooks "$@";;
+  consolidate) shift; exec python3 -c "import sys,os;sys.path.insert(0,'$H/lib');import consolidate,json;print(json.dumps(consolidate.consolidate(sys.argv[1],sys.argv[2],db=os.environ.get('HELIX_MEM_DB',os.path.join('$H','memory.db')),root='.')))" "$@";;
+  lm-up) exec $H/lmup.sh;;
+  lm-down) exec $H/lmdown.sh;;
+esac
+TERSE=${HELIX_TERSE:-ultra}; HANDLE=0; ARGS_IN=()
+while (( $# )); do case "$1" in --terse) TERSE=$2; shift 2;; --handle) HANDLE=1; shift;; *) ARGS_IN+=("$1"); shift;; esac; done
+[[ -n "$CL_HANDLE" ]] && HANDLE=1
+PRINT=0; [[ " ${ARGS_IN[*]} " == *" -p "* || " ${ARGS_IN[*]} " == *" --print "* ]] && PRINT=1
+[[ $HANDLE == 1 && $PRINT == 0 ]] && HANDLE=0   # @N expansion needs print mode
+$H/lmup.sh
+RD=$H/run/$$; mkdir -p $RD
+CFG=$(mktemp /tmp/.helix_mcp.XXXXXX)
+cat > $CFG <<J
+{"mcpServers":{"s":{"command":"$PY","args":["$H/sh_mcp.py"],"env":{"CL_RUN_DIR":"$RD","HELIX_HOME":"$H"}}}}
+J
+PROMPT=$($PY $H/compose.py --terse $TERSE $([[ $HANDLE == 1 ]] && echo --handle))
+ARGS=(--setting-sources project --settings "$H/settings.json" --disable-slash-commands --strict-mcp-config
+  --mcp-config "$CFG" --tools "" --system-prompt "$PROMPT" --model "${CL_MODEL:-sonnet}"
+  --exclude-dynamic-system-prompt-sections --effort low)
+if [[ $HANDLE == 1 ]]; then claude "${ARGS[@]}" "${ARGS_IN[@]}" | $PY $H/expand.py $RD
+else claude "${ARGS[@]}" "${ARGS_IN[@]}"; fi
+rc=$?; rm -f $CFG; rm -rf $RD; exit $rc

@@ -1,19 +1,22 @@
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.coverage
-htmlcov/
-.venv/
+# generated / local-only (never commit)
+settings.json
 venv/
-build/
-dist/
-*.egg-info/
+models/
+run/
+memory.db*
+mem.jsonl
+capsule.*.txt
+.helix/
+__pycache__/
+*.pyc
 .DS_Store
-Thumbs.db
-.idea/
-.vscode/
-*.sqlite3
-*.sqlite3-*
-*.log
-*.tmp
-.helixengine/
+# Laya training data, checkpoints, logs
+laya/ft*/
+laya/zs1*/
+laya/*.jsonl
+laya/*.csv
+laya/*.log
+laya/cb/
+# benchmark scratch
+bench/work/
+bench/ts_work/

@@ -1,0 +1,512 @@
+[
+ {
+  "family": "callers",
+  "prompt": "In this repository, which production (non-test) functions call `project` (defined in helixengine/release_data.py)? List the names of the calling functions.",
+  "truth": [
+   "_release"
+  ],
+  "kind": "set",
+  "id": "helixengine-callers-0",
+  "repo": "helixengine"
+ },
+ {
+  "family": "callers",
+  "prompt": "In this repository, which production (non-test) functions call `same_open_file` (defined in helixengine/core/plan_dependencies.py)? List the names of the calling functions.",
+  "truth": [
+   "read_file"
+  ],
+  "kind": "set",
+  "id": "helixengine-callers-1",
+  "repo": "helixengine"
+ },
+ {
+  "family": "coverage",
+  "prompt": "Which public functions/methods (names not starting with underscore) of helixengine/server.py are never referenced anywhere under the test files? Consider only functions/methods whose name is defined exactly once in this repository. List the names.",
+  "truth": [
+   "do_GET",
+   "do_POST",
+   "log_message",
+   "server_bind",
+   "stop"
+  ],
+  "kind": "set",
+  "universe": [
+   "server_bind",
+   "server_close",
+   "setup",
+   "log_message",
+   "runtime",
+   "do_GET",
+   "do_POST",
+   "make_server",
+   "serve",
+   "stop"
+  ],
+  "id": "helixengine-coverage-2",
+  "repo": "helixengine"
+ },
+ {
+  "family": "defparams",
+  "prompt": "Where is `project` defined (file path) and what are its parameter names (excluding self/cls)?",
+  "truth": [
+   "read_bytes",
+   "directory"
+  ],
+  "file": "helixengine/release_data.py",
+  "kind": "params",
+  "id": "helixengine-defparams-3",
+  "repo": "helixengine"
+ },
+ {
+  "family": "importers",
+  "prompt": "Which production modules (files) import `exclusive_lock` from the module that defines it (helixengine/core/locking.py)? List the file names.",
+  "truth": [
+   "renderer.py"
+  ],
+  "kind": "set",
+  "id": "helixengine-importers-4",
+  "repo": "helixengine"
+ },
+ {
+  "family": "docaudit",
+  "prompt": "List the public top-level functions in helixengine/core/evidence.py that have no docstring.",
+  "truth": [
+   "digest",
+   "main",
+   "packet",
+   "run"
+  ],
+  "kind": "set",
+  "universe": [
+   "digest",
+   "reduce_stream",
+   "packet",
+   "stop_tree",
+   "capture",
+   "run",
+   "main"
+  ],
+  "id": "helixengine-docaudit-5",
+  "repo": "helixengine"
+ },
+ {
+  "family": "callees",
+  "prompt": "Which functions defined in this repository does `project` (in helixengine/release_data.py) call directly? List only repository-defined functions whose name is defined exactly once in this repository.",
+  "truth": [
+   "delta",
+   "get"
+  ],
+  "kind": "set",
+  "id": "helixengine-callees-6",
+  "repo": "helixengine"
+ },
+ {
+  "family": "testcount",
+  "prompt": "How many test functions (functions whose name starts with `test`) in the test suite reference the identifier `project` (as a whole word) in their body? Give the number.",
+  "truth": 7,
+  "kind": "int",
+  "id": "helixengine-testcount-7",
+  "repo": "helixengine"
+ },
+ {
+  "family": "callers",
+  "prompt": "In this repository, which production (non-test) functions call `parse` (defined in experiments/preflight.py)? List the names of the calling functions.",
+  "truth": [
+   "representations"
+  ],
+  "kind": "set",
+  "id": "helixcontext-callers-0",
+  "repo": "helixcontext"
+ },
+ {
+  "family": "callers",
+  "prompt": "In this repository, which production (non-test) functions call `verified_native_view` (defined in engine/interception/metadata_bridge.py)? List the names of the calling functions.",
+  "truth": [
+   "lookup"
+  ],
+  "kind": "set",
+  "id": "helixcontext-callers-1",
+  "repo": "helixcontext"
+ },
+ {
+  "family": "coverage",
+  "prompt": "Which public functions/methods (names not starting with underscore) of experiments/preflight.py are never referenced anywhere under the test files? Consider only functions/methods whose name is defined exactly once in this repository. List the names.",
+  "truth": [
+   "reject_constant",
+   "unique_object"
+  ],
+  "kind": "set",
+  "universe": [
+   "unique_object",
+   "reject_constant",
+   "parse",
+   "serialize",
+   "representations",
+   "snapshot"
+  ],
+  "id": "helixcontext-coverage-2",
+  "repo": "helixcontext"
+ },
+ {
+  "family": "defparams",
+  "prompt": "Where is `verified_native_view` defined (file path) and what are its parameter names (excluding self/cls)?",
+  "truth": [
+   "source",
+   "view"
+  ],
+  "file": "engine/interception/metadata_bridge.py",
+  "kind": "params",
+  "id": "helixcontext-defparams-3",
+  "repo": "helixcontext"
+ },
+ {
+  "family": "importers",
+  "prompt": "Which production modules (files) import `packet` from the module that defines it (engine/prototype/evidence.py)? List the file names.",
+  "truth": [
+   "pilot.py"
+  ],
+  "kind": "set",
+  "id": "helixcontext-importers-4",
+  "repo": "helixcontext"
+ },
+ {
+  "family": "docaudit",
+  "prompt": "List the public top-level functions in engine/selection-gate-v2/gate.py that have no docstring.",
+  "truth": [
+   "expected",
+   "fixture",
+   "grade",
+   "mutant",
+   "sha"
+  ],
+  "kind": "set",
+  "universe": [
+   "sha",
+   "fixture",
+   "expected",
+   "grade",
+   "reference",
+   "mutant"
+  ],
+  "id": "helixcontext-docaudit-5",
+  "repo": "helixcontext"
+ },
+ {
+  "family": "callees",
+  "prompt": "Which functions defined in this repository does `lookup` (in engine/interception/metadata_bridge.py) call directly? List only repository-defined functions whose name is defined exactly once in this repository.",
+  "truth": [
+   "get",
+   "identity",
+   "verified_native_view"
+  ],
+  "kind": "set",
+  "id": "helixcontext-callees-6",
+  "repo": "helixcontext"
+ },
+ {
+  "family": "testcount",
+  "prompt": "How many test functions (functions whose name starts with `test`) in the test suite reference the identifier `parse` (as a whole word) in their body? Give the number.",
+  "truth": 7,
+  "kind": "int",
+  "id": "helixcontext-testcount-7",
+  "repo": "helixcontext"
+ },
+ {
+  "family": "callers",
+  "prompt": "In this repository, which production (non-test) functions call `open_stream` (defined in src/click/_compat.py)? List the names of the calling functions.",
+  "truth": [
+   "__init__",
+   "convert",
+   "open",
+   "open_file"
+  ],
+  "kind": "set",
+  "id": "click-callers-0",
+  "repo": "click"
+ },
+ {
+  "family": "callers",
+  "prompt": "In this repository, which production (non-test) functions call `_truncate_visible` (defined in src/click/_textwrap.py)? List the names of the calling functions.",
+  "truth": [
+   "_handle_long_word"
+  ],
+  "kind": "set",
+  "id": "click-callers-1",
+  "repo": "click"
+ },
+ {
+  "family": "coverage",
+  "prompt": "Which public functions/methods (names not starting with underscore) of src/click/_termui_impl.py are never referenced anywhere under the test files? Consider only functions/methods whose name is defined exactly once in this repository. List the names.",
+  "truth": [
+   "finish",
+   "get_editor",
+   "make_step",
+   "open_url",
+   "pct",
+   "render_finish",
+   "render_progress"
+  ],
+  "kind": "set",
+  "universe": [
+   "render_finish",
+   "pct",
+   "time_per_iteration",
+   "eta",
+   "format_eta",
+   "format_pos",
+   "format_pct",
+   "format_bar",
+   "format_progress_line",
+   "render_progress",
+   "make_step",
+   "update",
+   "finish",
+   "generator",
+   "get_editor",
+   "edit_files",
+   "open_url"
+  ],
+  "id": "click-coverage-2",
+  "repo": "click"
+ },
+ {
+  "family": "defparams",
+  "prompt": "Where is `open_stream` defined (file path) and what are its parameter names (excluding self/cls)?",
+  "truth": [
+   "filename",
+   "mode",
+   "encoding",
+   "errors",
+   "atomic"
+  ],
+  "file": "src/click/_compat.py",
+  "kind": "params",
+  "id": "click-defparams-3",
+  "repo": "click"
+ },
+ {
+  "family": "importers",
+  "prompt": "Which production modules (files) import `open_stream` from the module that defines it (src/click/_compat.py)? List the file names.",
+  "truth": [
+   "types.py",
+   "utils.py"
+  ],
+  "kind": "set",
+  "id": "click-importers-4",
+  "repo": "click"
+ },
+ {
+  "family": "docaudit",
+  "prompt": "List the public top-level functions in src/click/decorators.py that have no docstring.",
+  "truth": [
+   "command",
+   "command",
+   "command",
+   "command",
+   "group",
+   "group",
+   "group",
+   "group"
+  ],
+  "kind": "set",
+  "universe": [
+   "pass_context",
+   "pass_obj",
+   "make_pass_decorator",
+   "pass_meta_key",
+   "command",
+   "command",
+   "command",
+   "command",
+   "command",
+   "group",
+   "group",
+   "group",
+   "group",
+   "group",
+   "argument",
+   "option",
+   "confirmation_option",
+   "password_option",
+   "version_option",
+   "custom_version_option",
+   "help_option"
+  ],
+  "id": "click-docaudit-5",
+  "repo": "click"
+ },
+ {
+  "family": "callees",
+  "prompt": "Which functions defined in this repository does `open_stream` (in src/click/_compat.py) call directly? List only repository-defined functions whose name is defined exactly once in this repository.",
+  "truth": [
+   "_wrap_io_open",
+   "get_binary_stdin",
+   "get_binary_stdout",
+   "get_text_stdin",
+   "get_text_stdout",
+   "open"
+  ],
+  "kind": "set",
+  "id": "click-callees-6",
+  "repo": "click"
+ },
+ {
+  "family": "testcount",
+  "prompt": "How many test functions (functions whose name starts with `test`) in the test suite reference the identifier `add_completion_class` (as a whole word) in their body? Give the number.",
+  "truth": 3,
+  "kind": "int",
+  "id": "click-testcount-7",
+  "repo": "click"
+ },
+ {
+  "family": "callers",
+  "prompt": "In this repository, which production (non-test) functions call `mount` (defined in src/requests/sessions.py)? List the names of the calling functions.",
+  "truth": [
+   "__init__"
+  ],
+  "kind": "set",
+  "id": "requests-callers-0",
+  "repo": "requests"
+ },
+ {
+  "family": "callers",
+  "prompt": "In this repository, which production (non-test) functions call `build_connection_pool_key_attributes` (defined in src/requests/adapters.py)? List the names of the calling functions.",
+  "truth": [
+   "get_connection_with_tls_context"
+  ],
+  "kind": "set",
+  "id": "requests-callers-1",
+  "repo": "requests"
+ },
+ {
+  "family": "coverage",
+  "prompt": "Which public functions/methods (names not starting with underscore) of src/requests/sessions.py are never referenced anywhere under the test files? Consider only functions/methods whose name is defined exactly once in this repository. List the names.",
+  "truth": [
+   "merge_hooks",
+   "merge_setting",
+   "rebuild_auth",
+   "rebuild_method"
+  ],
+  "kind": "set",
+  "universe": [
+   "merge_setting",
+   "merge_hooks",
+   "get_redirect_target",
+   "should_strip_auth",
+   "resolve_redirects",
+   "rebuild_auth",
+   "rebuild_proxies",
+   "rebuild_method",
+   "prepare_request",
+   "merge_environment_settings",
+   "get_adapter",
+   "mount",
+   "session"
+  ],
+  "id": "requests-coverage-2",
+  "repo": "requests"
+ },
+ {
+  "family": "defparams",
+  "prompt": "Where is `mount` defined (file path) and what are its parameter names (excluding self/cls)?",
+  "truth": [
+   "prefix",
+   "adapter"
+  ],
+  "file": "src/requests/sessions.py",
+  "kind": "params",
+  "id": "requests-defparams-3",
+  "repo": "requests"
+ },
+ {
+  "family": "importers",
+  "prompt": "Which production modules (files) import `extract_cookies_to_jar` from the module that defines it (src/requests/cookies.py)? List the file names.",
+  "truth": [
+   "adapters.py",
+   "auth.py",
+   "sessions.py"
+  ],
+  "kind": "set",
+  "id": "requests-importers-4",
+  "repo": "requests"
+ },
+ {
+  "family": "docaudit",
+  "prompt": "List the public top-level functions in src/requests/utils.py that have no docstring.",
+  "truth": [
+   "iter_slices",
+   "iter_slices",
+   "super_len",
+   "to_key_val_list",
+   "to_key_val_list"
+  ],
+  "kind": "set",
+  "universe": [
+   "dict_to_sequence",
+   "super_len",
+   "get_netrc_auth",
+   "guess_filename",
+   "extract_zipped_paths",
+   "atomic_open",
+   "from_key_val_list",
+   "to_key_val_list",
+   "to_key_val_list",
+   "to_key_val_list",
+   "parse_list_header",
+   "parse_dict_header",
+   "unquote_header_value",
+   "dict_from_cookiejar",
+   "add_dict_to_cookiejar",
+   "get_encodings_from_content",
+   "get_encoding_from_headers",
+   "stream_decode_response_unicode",
+   "iter_slices",
+   "iter_slices",
+   "iter_slices",
+   "get_unicode_from_response",
+   "unquote_unreserved",
+   "requote_uri",
+   "address_in_network",
+   "dotted_netmask",
+   "is_ipv4_address",
+   "is_valid_cidr",
+   "set_environ",
+   "should_bypass_proxies",
+   "get_environ_proxies",
+   "select_proxy",
+   "resolve_proxies",
+   "default_user_agent",
+   "default_headers",
+   "parse_header_links",
+   "guess_json_utf",
+   "prepend_scheme_if_needed",
+   "get_auth_from_url",
+   "check_header_validity",
+   "urldefragauth",
+   "rewind_body"
+  ],
+  "id": "requests-docaudit-5",
+  "repo": "requests"
+ },
+ {
+  "family": "callees",
+  "prompt": "Which functions defined in this repository does `get_connection_with_tls_context` (in src/requests/adapters.py) call directly? List only repository-defined functions whose name is defined exactly once in this repository.",
+  "truth": [
+   "build_connection_pool_key_attributes",
+   "prepend_scheme_if_needed",
+   "proxy_manager_for",
+   "select_proxy"
+  ],
+  "kind": "set",
+  "id": "requests-callees-6",
+  "repo": "requests"
+ },
+ {
+  "family": "testcount",
+  "prompt": "How many test functions (functions whose name starts with `test`) in the test suite reference the identifier `mount` (as a whole word) in their body? Give the number.",
+  "truth": 8,
+  "kind": "int",
+  "id": "requests-testcount-7",
+  "repo": "requests"
+ }
+]

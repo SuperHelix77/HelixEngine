@@ -1,0 +1,1 @@
+{"cfg": "L2", "id": "click-importers-4", "repo": "click", "family": "importers", "rep": 3, "turns": 3, "input": 6, "cache_write": 846, "cache_read": 3946, "output": 195, "cost_usd": 0.0061352, "api_ms": 12424, "wall_s": 13.3, "correct": true, "detail": "recall=1.00 precision=1.00", "answer": "- `src/click/types.py`\n- `src/click/utils.py`", "judged": "CORRECT"}

@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+# lm [-n TOK] PROMPT  (stdin = context) : local model (private ollama :11500). Zero cloud tokens.
+import sys,json,urllib.request,os
+HOST=os.environ.get('LM_HOST','http://127.0.0.1:11500'); MODEL=os.environ.get('LM_MODEL','qwen3:1.7b')
+def chat(prompt,n=80,system=None):
+    msgs=([{'role':'system','content':system}] if system else [])+[{'role':'user','content':prompt}]
+    req=urllib.request.Request(HOST+'/api/chat',json.dumps({'model':MODEL,'stream':False,'think':False,'options':{'temperature':0,'num_predict':n,'num_ctx':8192},'messages':msgs}).encode(),{'Content-Type':'application/json'})
+    return json.load(urllib.request.urlopen(req,timeout=90))['message']['content'].strip()
+if __name__=='__main__':
+    a=sys.argv[1:]; n=80
+    if a[:1]==['-n']: n=int(a[1]); a=a[2:]
+    ctx='' if sys.stdin.isatty() else sys.stdin.read()
+    print(chat((ctx+'\n\n' if ctx else '')+' '.join(a),n))

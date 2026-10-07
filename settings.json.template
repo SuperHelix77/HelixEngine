@@ -1,0 +1,35 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__RTK__ hook claude",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "DISABLE_TELEMETRY": "1",
+    "DISABLE_AUTOUPDATER": "1",
+    "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
+    "DISABLE_COST_WARNINGS": "1",
+    "MAX_THINKING_TOKENS": "0",
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "4000",
+    "BASH_MAX_OUTPUT_LENGTH": "6000",
+    "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+    "CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING": "1",
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "40000",
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "80",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "haiku",
+    "CLAUDE_CODE_DISABLE_TERMINAL_TITLE": "1",
+    "CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING": "1",
+    "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS": "1",
+    "ENABLE_TOOL_SEARCH": "false"
+  },
+  "alwaysThinkingEnabled": false
+}

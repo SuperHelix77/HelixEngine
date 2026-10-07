@@ -1,0 +1,30 @@
+#!/usr/bin/env python3
+# docgen F... : add one-line docstring (local LLM) to every python function/class lacking one. 0 cloud output tokens.
+import sys,ast,re,os
+sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)))
+from importlib.machinery import SourceFileLoader
+lm=SourceFileLoader('lm',os.path.join(os.path.dirname(os.path.abspath(__file__)),'lm')).load_module()
+VERIFY='--verify' in sys.argv; args=[a for a in sys.argv[1:] if a!='--verify']; tot=0; rejected=[]
+sys.path.insert(0,os.path.join(os.environ.get('HELIX_HOME',os.path.dirname(os.path.dirname(os.path.realpath(__file__)))),'lib')); import verify
+verified=verify.docstring_ok
+for f in args:
+    s=open(f).read(); t=ast.parse(s); L=s.split('\n'); ins=[]
+    for n in ast.walk(t):
+        if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef,ast.ClassDef)) and not ast.get_docstring(n):
+            b=n.body[0]
+            if b.lineno==n.lineno: continue   # one-line def
+            src=ast.get_source_segment(s,n) or ''
+            kind='class' if isinstance(n,ast.ClassDef) else 'function'
+            d=lm.chat(f"Write a one-line Python docstring summary (max 12 words, imperative mood, no quotes) for this {kind}. Output only the summary.\n\n{src[:1500]}",40)
+            d=re.sub(r'["\'\\`]','',d.split('\n')[0]).strip().rstrip('.')
+            if not d or len(d)>110: d=f'{n.name.replace("_"," ").strip().capitalize()}'
+            d=d[0].upper()+d[1:]
+            if VERIFY:
+                ok,why=verified(d,src,n.name)
+                if not ok: rejected.append((f,n.name,why)); continue
+            ins.append((b.lineno,' '*b.col_offset+'"""'+d+'."""'))
+    for ln,txt in sorted(ins,reverse=True): L.insert(ln-1,txt)
+    if ins: open(f,'w').write('\n'.join(L))
+    tot+=len(ins)
+print('docgen ok',tot)
+if VERIFY and rejected: print('rejected by verification (left undocumented):',', '.join(f'{n}:{w}' for _,n,w in rejected))

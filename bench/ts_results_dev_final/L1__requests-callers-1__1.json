@@ -1,0 +1,1 @@
+{"cfg": "L1", "id": "requests-callers-1", "repo": "requests", "family": "callers", "rep": 1, "turns": 2, "input": 4, "cache_write": 852, "cache_read": 1819, "output": 92, "cost_usd": 0.0046998000000000005, "api_ms": 3342, "wall_s": 4.3, "correct": true, "detail": "recall=1.00 precision=1.00", "answer": "`get_connection_with_tls_context`", "judged": "CORRECT"}

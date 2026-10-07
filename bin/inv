@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+# inv callers NAME [-d DEFFILE] | inv tests NAME | inv imports NAME [-d DEFFILE] | inv def NAME [-d DEFFILE]
+# One call = whole investigation packet (prod/test split, wrapper flags, bodies of relevant callers).
+import sys,os,collections
+sys.path.insert(0,os.path.join(os.environ.get('HELIX_HOME',os.path.dirname(os.path.dirname(os.path.realpath(__file__)))),'lib')); import hops
+def args():
+    A=sys.argv[1:]; d=None
+    if '-d' in A: i=A.index('-d'); d=A[i+1]; del A[i:i+2]
+    return A,d
+def group(hs):
+    g=collections.OrderedDict()
+    for h in hs: g.setdefault((h['file'],h['fn']),[]).append(h['line'])
+    return g
+def main():
+    A,d=args(); op=A[0]; name=A[1]; r=hops.callers(name,'.',d)
+    defs=' '.join(f"{x['file']}:{x['line']}" for x in r['defs']) or 'none'
+    hits=[h for h in r['hits'] if h['fn']!='<import>']; imps=[h for h in r['hits'] if h['fn']=='<import>']
+    prod=[h for h in hits if not h['test']]; test=[h for h in hits if h['test']]
+    out=[]
+    if op=='callers':
+        out.append(f'callers {name} def {defs}: prod {len(group(prod))} test {len(group(test))}')
+        for (f,fn),ls in group(prod).items():
+            w=' [wrapper]' if any(h['wrapper'] for h in prod if h['file']==f and h['fn']==fn) else ''
+            out.append(f'P {f} {fn}:{",".join(map(str,ls))}{w}')
+        for (f,fn),ls in list(group(test).items())[:8]: out.append(f'T {f} {fn}:{",".join(map(str,ls))}')
+        if len(group(test))>8: out.append(f'T ..+{len(group(test))-8} more')
+        for (f,fn) in list(group(prod))[:4]:
+            if fn=='<module>': continue
+            s=hops.symbol(f,fn,24)
+            if s: out.append(f'--- {f} {fn}\n{s["src"]}')
+    elif op=='tests':
+        out.append(f'tests for {name}: {len(group(test))} test fns in {len(set(h["file"] for h in test))} files')
+        for (f,fn),ls in group(test).items(): out.append(f'T {f} {fn}:{",".join(map(str,ls))}')
+        for (f,fn),ls in group(prod).items(): out.append(f'P {f} {fn}:{",".join(map(str,ls))}')
+    elif op=='imports':
+        out.append(f'imports {name} def {defs}')
+        for h in imps: out.append(('T ' if h['test'] else 'P ')+f'{h["file"]}:{h["line"]} from {h["src"]}')
+        imp_files={h['file'] for h in imps}
+        for (f,fn),ls in group(prod).items():
+            if f in imp_files: out.append(f'uses P {f} {fn}:{",".join(map(str,ls))}')
+        loc=[k for k in group(prod) if k[0] not in imp_files]
+        if loc: out.append(f'local uses (def file): {len(loc)} fns')
+    elif op=='def':
+        for x in r['defs']:
+            s=hops.symbol(x['file'],name,40); out.append(f'def {x["file"]}:{x["line"]}\n{s["src"] if s else ""}')
+        out.append(f'callers: prod {len(group(prod))} test {len(group(test))}: '+' '.join(f'{f}:{fn}' for (f,fn) in list(group(prod))[:6]))
+    print('\n'.join(out))
+if __name__=='__main__': main()

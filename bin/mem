@@ -1,0 +1,11 @@
+#!/usr/bin/env python3
+# mem add TEXT | mem q TERM : tiny per-project notes, queried on demand (0 startup tokens)
+import sys,os,json,time
+db=os.path.join(os.environ.get('HELIX_HOME',os.path.dirname(os.path.dirname(os.path.realpath(__file__)))),'mem.jsonl'); cwd=os.getcwd()
+if sys.argv[1]=='add':
+    open(db,'a').write(json.dumps({'p':cwd,'t':sys.argv[2],'d':time.strftime('%F')})+'\n'); print('ok')
+elif sys.argv[1]=='q':
+    q=sys.argv[2].lower()
+    for l in (open(db) if os.path.exists(db) else []):
+        r=json.loads(l)
+        if r['p']==cwd and q in r['t'].lower(): print(r['d'],r['t'])

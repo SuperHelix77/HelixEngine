@@ -1,0 +1,3 @@
+#!/bin/sh
+# full F : exact whole-file read (bypasses the engine's preview policy)
+exec /bin/cat -- "$@"

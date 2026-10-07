@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+# hstep need "objective" KIND:ARG[+opt].. [--ops N] [--seconds S] [--frontier-tokens N]   one call = one local investigation = one EvidencePacket
+#   KINDS: callers:NAME[@DEFFILE][+depth2][+bodies3]  impact:NAME[@DEFFILE]  symbol:FILE:NAME  callees:FILE:NAME  imports:NAME[@DEFFILE]
+#          tests:NAME  outline:FILE  coverage:FILE  memory:word+word
+# hstep run STEP.json|-     (typed GoalStep)      hstep raw PACKET_ID [Ox]      hstep protocol
+import sys,os,json,re
+sys.path.insert(0,os.path.join(os.environ.get('HELIX_HOME',os.path.dirname(os.path.dirname(os.path.realpath(__file__)))),'lib'))
+import hcore,hcontrol
+A=sys.argv[1:]
+def die(m): sys.exit('hstep: '+m)
+def parse_need(tok):
+    kind,_,rest=tok.partition(':'); opts={}
+    parts=rest.split('+'); head=parts[0]
+    for o in parts[1:]:
+        m=re.fullmatch(r'(depth|bodies|cap)(\d+)',o)
+        if m: opts[m.group(1)]=int(m.group(2))
+        else: head+='+'+o if kind=='memory' else ''; 
+    if kind=='memory': return {'kind':'memory','q':' '.join(rest.split('+'))}
+    q={'kind':kind,**opts}
+    if kind in('callers','impact','imports'):
+        n,_,d=head.partition('@'); q['name']=n
+        if d: q['deffile']=d
+    elif kind in('symbol','callees'):
+        f,_,n=head.rpartition(':'); q['file']=f; q['name']=n
+    elif kind in('outline','coverage'): q['file']=head
+    elif kind=='tests':
+        n,_,d=head.partition('@'); q['name']=n
+        if d: q['deffile']=d
+    else: die(f'unknown kind {kind!r}')
+    return q
+if not A: sys.exit(__doc__)
+if A[0]=='protocol': print('HELIX Core',hcore.PROTOCOL_VERSION,hcore.protocol_hash()); sys.exit(0)
+if A[0]=='raw':
+    r=hcontrol.fetch_raw(A[1],A[2] if len(A)>2 else None); print(json.dumps(r,indent=1,default=str)[:6000] if r is not None else 'not found'); sys.exit(0)
+if A[0]=='run':
+    step=json.load(sys.stdin if A[1]=='-' else open(A[1]))
+elif A[0]=='need':
+    R=A[1:]; env={'may':list(hcore.OPS_READONLY),'budget':{}}
+    for flag,key in(('--ops','ops'),('--seconds','seconds'),('--frontier-tokens','frontier_tokens')):
+        if flag in R: i=R.index(flag); env['budget'][key]=float(R[i+1]); del R[i:i+2]
+    obj=R[0]; step={'step_id':'S1','objective':obj,'required_evidence':[parse_need(t) for t in R[1:]],'envelope':env}
+else:
+    # lenient: `hstep "objective" kind:arg ...` == `hstep need ...`
+    A=['need']+A; sys.argv=[sys.argv[0]]+A; R=A[1:]; env={'may':list(hcore.OPS_READONLY),'budget':{}}
+    for flag,key in(('--ops','ops'),('--seconds','seconds'),('--frontier-tokens','frontier_tokens')):
+        if flag in R: i=R.index(flag); env['budget'][key]=float(R[i+1]); del R[i:i+2]
+    toks=[t for t in R if re.match(r'^[a-z]+:',t) and t.split(':')[0] in ('callers','impact','symbol','callees','imports','tests','outline','coverage','memory')]
+    if not toks: die('no evidence requests (kind:arg) found; see usage')
+    obj=' '.join(t for t in R if t not in toks) or 'investigation'
+    step={'step_id':'S1','objective':obj,'required_evidence':[parse_need(t) for t in toks],'envelope':env}
+try: pkt=hcontrol.run_step(step)
+except hcore.ProtocolError as e: die(f'protocol error: {e}')
+print(hcontrol.render(pkt,hcore.goal_step(step)['envelope']['budget']['frontier_tokens']))

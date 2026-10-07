@@ -1,0 +1,1 @@
+{"cfg": "L1", "id": "helixcontext-testcount-7", "repo": "helixcontext", "family": "testcount", "rep": 1, "turns": 6, "input": 12, "cache_write": 2698, "cache_read": 10882, "output": 1001, "cost_usd": 0.023002400000000003, "api_ms": 14075, "wall_s": 15.1, "correct": true, "detail": "int", "answer": "7", "judged": "CORRECT"}

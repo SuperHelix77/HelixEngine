@@ -1,0 +1,1 @@
+{"cfg": "L1", "id": "requests-testcount-6", "repo": "requests", "family": "testcount", "rep": 1, "turns": 3, "input": 6, "cache_write": 1398, "cache_read": 3487, "output": 492, "cost_usd": 0.011221400000000001, "api_ms": 7025, "wall_s": 8.0, "correct": true, "detail": "int", "answer": "2", "judged": "CORRECT"}

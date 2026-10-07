@@ -1,0 +1,21 @@
+#!/usr/bin/env python3
+# callers [-l] [-d DEFFILE] NAME [dir] : D=def, C=file (src) fn:line.. ; -l => file:function list. Python: ast, import/def/scope-resolved.
+import sys,os
+sys.path.insert(0,os.path.join(os.environ.get('HELIX_HOME',os.path.dirname(os.path.dirname(os.path.realpath(__file__)))),'lib')); import hops
+A=sys.argv[1:]; DEF=None
+if '-d' in A: i=A.index('-d'); DEF=A[i+1]; del A[i:i+2]
+LIST='-l' in A; A=[a for a in A if a!='-l']; name=A[0]; root=A[1] if len(A)>1 else '.'
+r=hops.callers(name,root,DEF)
+if LIST:
+    seen=set()
+    for h in r['hits']:
+        if h['fn'] in('<import>',): continue
+        k=(h['file'],h['fn'])
+        if k not in seen: seen.add(k); print(f"{h['file']}:{h['fn']}")
+else:
+    for d in r['defs']: print(f"D {d['file']}:{d['line']}")
+    byf={}
+    for h in r['hits']:
+        if h['fn']=='<import>': continue
+        byf.setdefault((h['file'],h['src']),[]).append(f"{h['fn']}:{h['line']}")
+    for (f,src),v in byf.items(): print(f"C {f} ({src}) "+' '.join(dict.fromkeys(v)))

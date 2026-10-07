@@ -1,0 +1,8 @@
+#!/usr/bin/env python3
+# ask F... -- QUESTION : local LLM answers from the files (<=40 words, terse). 0 cloud tokens, may be wrong: verify if critical.
+import sys,os
+from importlib.machinery import SourceFileLoader
+lm=SourceFileLoader('lm',os.path.join(os.path.dirname(os.path.abspath(__file__)),'lm')).load_module()
+a=sys.argv[1:]; i=a.index('--'); files,q=a[:i],' '.join(a[i+1:])
+ctx='\n\n'.join(f'### {f}\n{open(f).read()[:12000]}' for f in files)
+print(lm.chat(f"{ctx}\n\nQuestion: {q}\nAnswer in <=40 words, terse, exact identifiers and error strings, no preamble.",90))

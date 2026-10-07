@@ -1,0 +1,1 @@
+{"cfg": "L1", "id": "helixengine-callers-0", "repo": "helixengine", "family": "callers", "rep": 2, "turns": 2, "input": 4, "cache_write": 1375, "cache_read": 1251, "output": 114, "cost_usd": 0.0067122, "api_ms": 3616, "wall_s": 4.5, "correct": true, "detail": "recall=1.00 precision=1.00", "answer": "`do_GET`", "judged": "CORRECT"}

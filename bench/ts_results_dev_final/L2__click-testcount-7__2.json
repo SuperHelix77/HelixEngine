@@ -1,0 +1,1 @@
+{"cfg": "L2", "id": "click-testcount-7", "repo": "click", "family": "testcount", "rep": 2, "turns": 3, "input": 6, "cache_write": 1170, "cache_read": 4233, "output": 500, "cost_usd": 0.010538599999999999, "api_ms": 8254, "wall_s": 9.2, "correct": true, "detail": "int", "answer": "**3**", "judged": "CORRECT"}

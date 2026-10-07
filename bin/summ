@@ -1,0 +1,7 @@
+#!/usr/bin/env python3
+# summ F... : local LLM summary (<=40 words) of files.
+import sys,os
+from importlib.machinery import SourceFileLoader
+lm=SourceFileLoader('lm',os.path.join(os.path.dirname(os.path.abspath(__file__)),'lm')).load_module()
+ctx='\n\n'.join(f'### {f}\n{open(f).read()[:12000]}' for f in sys.argv[1:])
+print(lm.chat(f"{ctx}\n\nSummarize what this code does in <=40 words, terse, exact identifiers.",90))

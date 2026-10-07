@@ -1,0 +1,1 @@
+{"cfg": "L1", "id": "helixengine-testcount-7", "repo": "helixengine", "family": "testcount", "rep": 1, "turns": 6, "input": 12, "cache_write": 2420, "cache_read": 10386, "output": 911, "cost_usd": 0.018311200000000003, "api_ms": 12266, "wall_s": 13.0, "correct": true, "detail": "int", "answer": "3", "judged": "CORRECT"}
