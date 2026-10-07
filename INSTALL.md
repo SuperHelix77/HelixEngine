@@ -112,8 +112,7 @@ The local model writes docstrings (`docgen --verify` rejects hallucinated identi
 See `bench/README.md` (regenerate the report from included raw results with no API calls, or re-run the campaign on your own plan).
 
 ## Troubleshooting
-- `helix: command not found` -> add `~/.local/bin` to PATH (see step 2). A Grok install links `helix-grok`, not `helix`.
-- Grok shows `hook not executed: required env var(s) not set` -> the hook command contains an unset `$NAME`. Reinstall with `helix grok hooks install` and start a new session. Helix's own command has no `$`.
+- `helix: command not found` -> add `~/.local/bin` to PATH (see step 2).
 - `claude: command not found` / not logged in -> install and run `claude` once.
 - `You've hit your session limit` in benchmark runs -> your plan's usage limit; the runner stops and records nothing; wait for the reset.
 - `rtk rewrite` seems to do nothing -> rtk exits with code 3 when it rewrites; Helix accepts 0 and 3. Check `rtk rewrite "git status"`.
@@ -122,4 +121,12 @@ See `bench/README.md` (regenerate the report from included raw results with no A
 - Python < 3.9 -> install a newer Python and set `HELIX_PYTHON=/path/to/python3`.
 
 ## Uninstall
-`./uninstall.sh` (removes the `helix` link), `helix hooks uninstall` (Claude hooks), `helix grok hooks uninstall` and delete `~/.grok/skills/helix/SKILL.md` (Grok), then `rm -rf` the clone (this also deletes that tree's `memory.db`). `uninstall.sh` does not remove a `helix-grok` link; delete that symlink yourself if you created one.
+`./uninstall.sh` removes the `helix` or `helix-grok` link when it points at this tree. `helix hooks uninstall` removes Claude hooks. `helix grok hooks uninstall` removes the Grok hook file (a backup is left beside it); also delete `~/.grok/skills/helix/SKILL.md` if you want the skill gone. `rm -rf` on the clone deletes that tree's `memory.db`.
+
+## Grok troubleshooting
+- `hook not executed: required env var(s) not set` -> the hook command contains an unset `$NAME`. Grok does not spawn it. Run `helix grok hooks install` and start a new session. Helix's own command has no `$`. A session that is already open keeps the old command until `/hooks` then `r`.
+- `helix: command not found` after `./install.sh --grok` -> that install links `helix-grok`, not `helix`.
+- Hooks succeed and `memory.db` stays empty -> `HELIX_HOME` is a different tree, often `~/.claude-lean`. Query this tree's database.
+- No capsule on a new Grok session -> SessionStart must match `startup|resume|clear|compact`.
+- PreToolUse never runs -> the matcher is `Bash`, which Grok applies to `run_terminal_command`.
+- `helix doctor` checks the Claude install -> use `helix-grok`, or set `HELIX_HOME` to this clone.
