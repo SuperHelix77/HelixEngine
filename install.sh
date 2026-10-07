@@ -33,7 +33,7 @@ else: out=json.loads(s); out['hooks']={}
 json.dump(out,open(here+'/settings.json','w'),indent=2); open(here+'/settings.json','a').write('\n')
 PY
 ok "generated settings.json (profile used by 'helix' only; your ~/.claude/settings.json is untouched)"
-mkdir -p "$HERE/run"; chmod +x "$HERE/helix" "$HERE"/bin/* "$HERE"/*.sh "$HERE"/adapters/*.py "$HERE/helix_doctor.py" 2>/dev/null || true
+mkdir -p "$HERE/run"; chmod +x "$HERE/helix" "$HERE"/bin/* "$HERE"/*.sh "$HERE/adapters/claude_code.py" "$HERE/adapters/standalone.py" "$HERE/helix_doctor.py" 2>/dev/null || true
 if [ "$LINK" = 1 ]; then mkdir -p "$PREFIX"; ln -sf "$HERE/helix" "$PREFIX/helix"; ok "linked $PREFIX/helix"
   case ":$PATH:" in *":$PREFIX:"*) ;; *) warn "$PREFIX is not on your PATH. Add:  export PATH=\"$PREFIX:\$PATH\"";; esac; fi
 if [ "$LOCAL" = 1 ]; then
